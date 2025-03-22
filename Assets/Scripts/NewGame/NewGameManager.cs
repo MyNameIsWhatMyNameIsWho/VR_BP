@@ -137,8 +137,8 @@ public class NewGameManager : NetworkBehaviour
         // Start with default cube position
         character.Spawn();
 
-        // Reset Highscore to 0 at the beginning of the game
-        ResetHighscoreIfNotZero();
+        // Load the existing highscore at the beginning of the game
+        LoadHighscore();
 
         // Play instructions if needed
         StartCoroutine(PlayInstructions());
@@ -154,15 +154,12 @@ public class NewGameManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Resets the high score to 0 if it's not already 0.
+    /// Load the highscore from PlayerPrefs
     /// </summary>
-    private void ResetHighscoreIfNotZero()
+    private void LoadHighscore()
     {
-        if (Highscore != 0f)
-        {
-            Debug.Log($"Highscore before reset: {Highscore}. Resetting to 0.");
-            Highscore = 0f;
-        }
+        // No need to reset the highscore, just log it for debugging
+        Debug.Log($"Current highscore: {Highscore}");
     }
 
     /// <summary>
@@ -230,8 +227,16 @@ public class NewGameManager : NetworkBehaviour
             yield return new WaitForSeconds(waitAfterDeath);
             Debug.Log("End game coroutine after wait");
 
+            // Only update the highscore if the current score is higher
             if (Highscore < score)
+            {
+                Debug.Log($"New highscore achieved! Old: {Highscore}, New: {score}");
                 Highscore = score;
+            }
+            else
+            {
+                Debug.Log($"Score: {score}, Highscore remains: {Highscore}");
+            }
 
             Debug.Log($"Highscore updated to: {Highscore}");
 
@@ -358,7 +363,7 @@ public class NewGameManager : NetworkBehaviour
         score = 0f;
         ChangeScore(Mathf.RoundToInt(score));
 
-        ResetHighscoreIfNotZero();
+        LoadHighscore();
 
         if (GestureDetector.Instance != null)
         {
@@ -378,7 +383,7 @@ public class NewGameManager : NetworkBehaviour
         if (scoreText != null)
         {
             scoreText.text = newScore.ToString();
-            //Debug.Log($"In-game score updated to: {newScore}");
+            Debug.Log($"In-game score updated to: {newScore}");
         }
         else
         {

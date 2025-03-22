@@ -5,7 +5,7 @@ using UnityEngine;
 public class NewGameMenuManager : GameMenuManager
 {
     private NewGameManager newGameManager;
-    private bool gameSetupInitialized = false;
+    private bool gameSetupInitialized;
 
     [ClientRpc]
     public override void LoadLevel(int level)

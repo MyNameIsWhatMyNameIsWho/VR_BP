@@ -7,7 +7,7 @@ public class Character_NewGame : NetworkBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float minX = -5f;  // Left boundary for the cube
     [SerializeField] private float maxX = 5f;   // Right boundary for the cube
-    [SerializeField] private float handMovementScale = 20.0f; // Higher = less hand movement needed
+    [SerializeField] private float handMovementScale = 40.0f; // Higher = less hand movement needed
     [SerializeField] private float smoothingFactor = 0.05f; // Lower = smoother movement (0-1)
 
     [Header("Gesture Control")]
