@@ -1,0 +1,54 @@
+{
+    "name": "GameInputSystem",
+    "maps": [
+        {
+            "name": "GestureRecording",
+            "id": "c8356526-907d-46ca-b1c4-d1bf396b8717",
+            "actions": [
+                {
+                    "name": "RecordGestureL",
+                    "type": "Button",
+                    "id": "85b65559-26be-4aae-84bd-47bb3953beae",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RecordGestureR",
+                    "type": "Button",
+                    "id": "bd0a7e5b-511f-4e24-8446-566f2e97564f",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "c74c92be-e7e9-403e-a94d-bf0ce061075c",
+                    "path": "<Keyboard>/leftArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RecordGestureL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "83d82e85-0815-4146-a533-82daf6ad4bcc",
+                    "path": "<Keyboard>/rightArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RecordGestureR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
