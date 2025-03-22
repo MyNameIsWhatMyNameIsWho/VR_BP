@@ -7,91 +7,120 @@ public class Character_NewGame : NetworkBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float minX = -5f;  // Left boundary for the cube
     [SerializeField] private float maxX = 5f;   // Right boundary for the cube
-    [SerializeField] private float moveSmoothing = 0.1f; // Smoothing factor for movement
-    [SerializeField] private float movementSensitivity = 1.0f; // How much the cube moves relative to hand movement
+    [SerializeField] private float handMovementScale = 20.0f; // Higher = less hand movement needed
+    [SerializeField] private float smoothingFactor = 0.05f; // Lower = smoother movement (0-1)
 
     [Header("Gesture Control")]
     public bool controllingHandIsLeft = false;
 
     [Header("Events")]
-    [Tooltip("Invoked when the hand position is updated.")]
     public UnityEvent OnHandPositionUpdated;
 
+    // Movement state
     private bool canMove = false;
-    private Transform cachedTransform;
-    private Vector3 previousHandPosition;
-    private bool isHandPositionInitialized = false;
+    private Vector3 initialHandPosition;
+    private bool isInitialized = false;
 
-    private void Awake()
-    {
-        cachedTransform = transform;
-    }
+    // Debugging
+    private int frameCount = 0;
 
     private void Update()
     {
         if (!canMove) return;
 
-        // Get the hand we are tracking
-        var hand = controllingHandIsLeft ? GestureDetector.Instance.handL : GestureDetector.Instance.handR;
-        if (hand == null) return;
+        // Debugging log counter
+        frameCount++;
+        bool shouldLog = (frameCount % 30 == 0);
 
-        // Get the current hand position
-        Vector3 currentHandPosition = hand.transform.position;
+        // Get hand position
+        Vector3 currentHandPosition = GetHandPosition();
+        if (currentHandPosition == Vector3.zero) return; // Invalid hand position
 
-        // Initialize previous position if this is the first update
-        if (!isHandPositionInitialized)
+        // Initialize reference position if needed
+        if (!isInitialized)
         {
-            previousHandPosition = currentHandPosition;
-            isHandPositionInitialized = true;
+            initialHandPosition = currentHandPosition;
+            isInitialized = true;
+            Debug.Log($"Initial hand position set: {initialHandPosition}");
             return;
         }
 
-        // Calculate the hand's movement delta
-        float handDeltaX = currentHandPosition.x - previousHandPosition.x;
+        // Calculate offset from initial position
+        float handOffset = currentHandPosition.x - initialHandPosition.x;
 
-        // Apply sensitivity to the movement
-        float movementAmount = handDeltaX * movementSensitivity;
+        // Apply high scaling factor to make small movements go further
+        float scaledOffset = handOffset * handMovementScale;
 
-        // Calculate new position with boundaries
-        Vector3 currentCubePos = cachedTransform.position;
-        float newX = Mathf.Clamp(currentCubePos.x + movementAmount, minX, maxX);
+        // Calculate target position
+        float centerX = (minX + maxX) / 2f;
+        float targetX = Mathf.Clamp(centerX + scaledOffset, minX, maxX);
 
-        // Set the new position with smoothing
-        currentCubePos.x = Mathf.Lerp(currentCubePos.x, newX, moveSmoothing);
-        cachedTransform.position = currentCubePos;
+        // Smoothly move toward the target position
+        transform.position = Vector3.Lerp(
+            transform.position,
+            new Vector3(targetX, transform.position.y, transform.position.z),
+            smoothingFactor
+        );
 
-        // Update the previous hand position for next frame
-        previousHandPosition = currentHandPosition;
+        // Log information
+        if (shouldLog)
+        {
+            float percentToEdge = Mathf.Abs((targetX - centerX) / ((maxX - minX) / 2f)) * 100f;
+            Debug.Log($"Hand offset: {handOffset:F4}, Scaled: {scaledOffset:F2}, " +
+                     $"Target X: {targetX:F4}, Percent to edge: {percentToEdge:F1}%");
+        }
 
+        // Trigger event
         OnHandPositionUpdated?.Invoke();
     }
 
-    /// <summary>
-    /// Enables the cube to move according to the hand.
-    /// </summary>
-    public void StartMovement()
+    // Helper method to get hand position
+    private Vector3 GetHandPosition()
     {
-        canMove = true;
-        isHandPositionInitialized = false; // Reset this so we get a clean starting point
+        if (GestureDetector.Instance == null)
+        {
+            Debug.LogError("GestureDetector.Instance is null!");
+            return Vector3.zero;
+        }
+
+        var interactor = controllingHandIsLeft ?
+            GestureDetector.Instance.handL?.Interactor :
+            GestureDetector.Instance.handR?.Interactor;
+
+        if (interactor == null || interactor.RaycastStartingPoint == null)
+        {
+            Debug.LogError("Hand reference is invalid");
+            return Vector3.zero;
+        }
+
+        return interactor.RaycastStartingPoint.position;
     }
 
-    /// <summary>
-    /// Disables the cube's movement.
-    /// </summary>
+    public void StartMovement()
+    {
+        Debug.Log("Starting movement with high sensitivity");
+        canMove = true;
+        isInitialized = false;
+        frameCount = 0;
+    }
+
     public void GameOver()
     {
+        Debug.Log("Game over - stopping movement");
         canMove = false;
     }
 
-    /// <summary>
-    /// Resets the cube for a new game.
-    /// </summary>
     public void Spawn()
     {
-        canMove = true;
-        isHandPositionInitialized = false; // Reset this so we get a clean starting point
+        Debug.Log("Spawning cube");
+        canMove = false;
+        isInitialized = false;
 
-        // Reset the cube to the center between minX and maxX
-        cachedTransform.position = new Vector3((minX + maxX) / 2f, cachedTransform.position.y, cachedTransform.position.z);
+        // Reset position to center
+        transform.position = new Vector3(
+            (minX + maxX) / 2f,
+            transform.position.y,
+            transform.position.z
+        );
     }
 }

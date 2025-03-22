@@ -99,54 +99,58 @@ public class NewGameManager : NetworkBehaviour
 
         obstaclesInstances = new List<GameObject>();
 
-        // Subscribe to character's gesture detected event
-        if (character != null)
+        // Make sure the character reference is valid
+        if (character == null)
         {
-            Debug.Log("Subscribed to character's OnGestureDetected event");
-        }
-        else
-        {
-            Debug.LogError("Character_NewGame reference is missing in NewGameManager.");
+            Debug.LogError("Character reference is missing in NewGameManager!");
+            return;
         }
 
-        // Set up controlling hand
+        // Set up gesture detection to start the game
         if (GestureDetector.Instance != null)
         {
+            // Remove any existing listeners to avoid duplicates
+            GestureDetector.Instance.OnGestureBegin.RemoveListener(OnGestureDetectedHandler);
+            GestureDetector.Instance.OnGestureBegin.AddListener(OnGestureDetectedHandler);
+
+            // Set up controlling hand
             GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
             GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
+
+            // If right hand is disabled, switch to left
+            if (GestureDetector.Instance.handR != null && GestureDetector.Instance.handR.IsDisabled)
+            {
+                character.controllingHandIsLeft = !character.controllingHandIsLeft;
+                GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
+                GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
+                Debug.Log("Right hand disabled: switched controlling hand");
+            }
+
+            // Debug which hand is controlling
+            Debug.Log("Controlling hand is " + (character.controllingHandIsLeft ? "LEFT" : "RIGHT"));
         }
         else
         {
             Debug.LogError("GestureDetector.Instance is null. Ensure it is correctly set up.");
         }
 
-        // If right hand is disabled, switch to left
-        if (GestureDetector.Instance.handR != null && GestureDetector.Instance.handR.IsDisabled)
-        {
-            character.controllingHandIsLeft = !character.controllingHandIsLeft;
-            GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
-            GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
-            Debug.Log("Right hand disabled: switched controlling hand");
-        }
+        // Start with default cube position
+        character.Spawn();
 
-        // Hide switch-hands button if either hand is disabled
-        if (GestureDetector.Instance.handR != null && GestureDetector.Instance.handL != null &&
-            (GestureDetector.Instance.handR.IsDisabled || GestureDetector.Instance.handL.IsDisabled))
-        {
-            Debug.Log("One of the hands is disabled: hiding switch hands button");
-        }
-
-        StartCoroutine(PlayInstructions());
-
-        // Reset Highscore to 0 at the beginning of the game if it's not already 0.
+        // Reset Highscore to 0 at the beginning of the game
         ResetHighscoreIfNotZero();
+
+        // Play instructions if needed
+        StartCoroutine(PlayInstructions());
     }
 
     private IEnumerator PlayInstructions()
     {
         string mode = hasObstacles ? "Obstacles" : "Screws";
         yield return null;
-        // Audio instructions commented out
+        // Uncomment below if you want to play audio instructions
+        // yield return new WaitForSeconds(AudioManager.Instance.PlayInstruction("InstructionsNewGame" + mode));
+        // yield return new WaitForSeconds(AudioManager.Instance.PlayInstruction("InstructionsNewGameEnd"));
     }
 
     /// <summary>
@@ -165,11 +169,15 @@ public class NewGameManager : NetworkBehaviour
     /// Handler invoked when a gesture is detected.
     /// Starts the game if not already running and endgame UI is not active.
     /// </summary>
-    private void OnGestureDetectedHandler(GestureType gesture)
+    private void OnGestureDetectedHandler(GestureType gesture, bool isLeft)
     {
-        if (!gameRunning && !endgameInfo.activeSelf)
+        // Check if this is the controlling hand
+        bool isControllingHand = (character.controllingHandIsLeft == isLeft);
+
+        // Start game if not already running and if it's the controlling hand
+        if (!gameRunning && !endgameInfo.activeSelf && isControllingHand)
         {
-            Debug.Log($"Gesture detected: {gesture}");
+            Debug.Log($"Gesture detected from controlling hand: {gesture}");
             StartGame();
         }
     }
@@ -180,11 +188,6 @@ public class NewGameManager : NetworkBehaviour
 
         score += movementSpeed * Time.fixedDeltaTime;
         ChangeScore(Mathf.RoundToInt(score)); // Round the score
-
-        if (!hasObstacles)
-        {
-            // Time-based logic if needed
-        }
     }
 
     private void OnDestroy()
@@ -194,7 +197,12 @@ public class NewGameManager : NetworkBehaviour
             foreach (var o in obstaclesInstances)
                 NetworkServer.Destroy(o);
         }
-        // AudioManager stop commented out
+
+        // Remove gesture listener
+        if (GestureDetector.Instance != null)
+        {
+            GestureDetector.Instance.OnGestureBegin.RemoveListener(OnGestureDetectedHandler);
+        }
     }
 
     [ClientRpc]
@@ -228,6 +236,14 @@ public class NewGameManager : NetworkBehaviour
             Debug.Log($"Highscore updated to: {Highscore}");
 
             DisplayEndGameInfo(true);
+
+            // Log game data
+            if (LoggerCommunicationProvider.Instance != null)
+            {
+                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_score", "\"" + score.ToString() + "\"");
+                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_highscore", "\"" + Highscore.ToString() + "\"");
+                LoggerCommunicationProvider.Instance.StopLogging();
+            }
         }
         OnGameEnd.Invoke();
     }
@@ -252,17 +268,49 @@ public class NewGameManager : NetworkBehaviour
     public void StartGame()
     {
         Debug.Log("StartGame invoked");
+
+        // Trigger UI changes
         OnGameStart.Invoke();
+
         if (!isServer || gameRunning) return;
 
-        gameRunning = true;
+        // Ensure character reference is valid
+        if (character == null)
+        {
+            Debug.LogError("Character reference is missing in StartGame!");
+            return;
+        }
 
+        // Double-check GestureDetector is available
+        if (GestureDetector.Instance == null)
+        {
+            Debug.LogError("GestureDetector.Instance is null in StartGame!");
+            return;
+        }
+
+        // Set game state to running
+        gameRunning = true;
+        score = 0;
+        ChangeScore(0);
+
+        // Start obstacle spawning if enabled
         if (hasObstacles && obstaclePrefab != null)
         {
+            if (obstacleSpawningCoroutine != null)
+                StopCoroutine(obstacleSpawningCoroutine);
             obstacleSpawningCoroutine = StartCoroutine(SpawnObstacles());
         }
 
+        // Initialize movement on the character
+        Debug.Log("Telling character to start movement");
         character.StartMovement();
+
+        // Log the start of a new game
+        if (LoggerCommunicationProvider.Instance != null)
+        {
+            LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
+            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode", hasObstacles ? "\"With obstacles\"" : "\"Without obstacles\"");
+        }
     }
 
     private IEnumerator SpawnObstacles()
@@ -330,7 +378,7 @@ public class NewGameManager : NetworkBehaviour
         if (scoreText != null)
         {
             scoreText.text = newScore.ToString();
-            Debug.Log($"In-game score updated to: {newScore}");
+            //Debug.Log($"In-game score updated to: {newScore}");
         }
         else
         {

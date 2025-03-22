@@ -5,6 +5,7 @@ using UnityEngine;
 public class NewGameMenuManager : GameMenuManager
 {
     private NewGameManager newGameManager;
+    private bool gameSetupInitialized = false;
 
     [ClientRpc]
     public override void LoadLevel(int level)
@@ -24,26 +25,45 @@ public class NewGameMenuManager : GameMenuManager
 
         // Get the main game logic component from the spawned level prefab
         newGameManager = currentlyPlayedLevel.GetComponent<NewGameManager>();
-        // At this point, newGameManager is ready and you can start your game logic if needed.
-    }
 
-    [Command(requiresAuthority = false)]
-    public void CmdMoveLeft()
-    {
-        if (newGameManager)
+        if (newGameManager != null)
         {
-            //newGameManager.MoveCubeLeft();
-            return;
+            // Configure the game based on the level number if needed
+            // For example, set difficulty, obstacles, etc.
+            gameSetupInitialized = true;
+            Debug.Log("NewGame setup completed successfully");
+        }
+        else
+        {
+            Debug.LogError("Failed to find NewGameManager component on the spawned level");
         }
     }
 
     [Command(requiresAuthority = false)]
-    public void CmdMoveRight()
+    public void CmdResetNewGame()
     {
-        if (newGameManager)
+        if (newGameManager != null)
         {
-            //newGameManager.MoveCubeRight();
+            newGameManager.RestartGame();
             return;
+        }
+        else
+        {
+            Debug.LogError("NewGameManager is null, cannot restart game");
+        }
+    }
+
+    [Command(requiresAuthority = false)]
+    public void CmdSwitchHands()
+    {
+        if (newGameManager != null)
+        {
+            newGameManager.SwitchHands();
+            return;
+        }
+        else
+        {
+            Debug.LogError("NewGameManager is null, cannot switch hands");
         }
     }
 }
