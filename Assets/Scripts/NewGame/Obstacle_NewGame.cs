@@ -1,13 +1,27 @@
 using UnityEngine;
-using Mirror; // Ensure Mirror is included if using networking
+using Mirror;
 
-public class Obstacle_NewGame : NetworkBehaviour
+public class Obstacle_NewGame : MonoBehaviour
 {
-    [SerializeField] private float fallSpeed = 5f; // Speed at which the obstacle falls
+    private float fallSpeed;
+
+    public void Initialize()
+    {
+        // Get the speed from the central manager - the ONLY place speeds are defined
+        if (NewGameManager.Instance != null)
+        {
+            fallSpeed = NewGameManager.Instance.ObstacleFallSpeed;
+        }
+        else
+        {
+            fallSpeed = 0.8f; // Fallback default only used if something goes wrong
+            Debug.LogError("NewGameManager.Instance is null in Obstacle Initialize!");
+        }
+    }
 
     private void Update()
     {
-        if (!isServer) return;
+        if (!NetworkServer.active) return;
 
         // Move the obstacle downward
         transform.Translate(Vector3.down * fallSpeed * Time.deltaTime);
@@ -21,32 +35,26 @@ public class Obstacle_NewGame : NetworkBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (!isServer) return;
+        if (!NetworkServer.active) return;
 
         if (collision.gameObject.CompareTag("Player"))
         {
-            Debug.Log("Obstacle collided with Player.");
-            // End the game via NewGameManager
+            // Disable the collider immediately to prevent jittering
+            GetComponent<Collider>().enabled = false;
+
+            // Freeze the obstacle in place
+            Rigidbody rb = GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = true;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            // End the game
             if (NewGameManager.Instance != null)
             {
-                // Disable the collider immediately to prevent jittering
-                GetComponent<Collider>().enabled = false;
-
-                // Freeze the obstacle in place
-                Rigidbody rb = GetComponent<Rigidbody>();
-                if (rb != null)
-                {
-                    rb.isKinematic = true;
-                    rb.velocity = Vector3.zero;
-                    rb.angularVelocity = Vector3.zero;
-                }
-
-                // End the game
                 NewGameManager.Instance.EndGame();
-            }
-            else
-            {
-                Debug.LogError("NewGameManager instance is null.");
             }
         }
     }

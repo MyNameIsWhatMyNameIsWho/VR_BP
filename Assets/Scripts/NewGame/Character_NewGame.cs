@@ -7,8 +7,9 @@ public class Character_NewGame : NetworkBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float minX = -5f;  // Left boundary for the cube
     [SerializeField] private float maxX = 5f;   // Right boundary for the cube
-    [SerializeField] private float handMovementScale = 40.0f; // Higher = less hand movement needed
+    [SerializeField] private float handMovementScale = 50.0f; // Much higher multiplier for less hand movement required
     [SerializeField] private float smoothingFactor = 0.05f; // Lower = smoother movement (0-1)
+    [SerializeField] private float wallBuffer = 0.1f; // Increased buffer distance from wall to prevent jittering
 
     [Header("Gesture Control")]
     public bool controllingHandIsLeft = false;
@@ -20,9 +21,17 @@ public class Character_NewGame : NetworkBehaviour
     private bool canMove = false;
     private Vector3 initialHandPosition;
     private bool isInitialized = false;
+    private Vector3 lastValidPosition;
+    private bool isAtLeftWall = false;
+    private bool isAtRightWall = false;
 
     // Debugging
     private int frameCount = 0;
+
+    private void Awake()
+    {
+        lastValidPosition = new Vector3((minX + maxX) / 2f, transform.position.y, transform.position.z);
+    }
 
     private void Update()
     {
@@ -30,7 +39,7 @@ public class Character_NewGame : NetworkBehaviour
 
         // Debugging log counter
         frameCount++;
-        bool shouldLog = (frameCount % 30 == 0);
+        bool shouldLog = (frameCount % 60 == 0);
 
         // Get hand position
         Vector3 currentHandPosition = GetHandPosition();
@@ -55,19 +64,44 @@ public class Character_NewGame : NetworkBehaviour
         float centerX = (minX + maxX) / 2f;
         float targetX = Mathf.Clamp(centerX + scaledOffset, minX, maxX);
 
-        // Smoothly move toward the target position
-        transform.position = Vector3.Lerp(
-            transform.position,
-            new Vector3(targetX, transform.position.y, transform.position.z),
-            smoothingFactor
-        );
+        // Determine if we're at or very near a wall boundary
+        isAtLeftWall = (transform.position.x <= minX + wallBuffer);
+        isAtRightWall = (transform.position.x >= maxX - wallBuffer);
 
-        // Log information
+        // Check if we're trying to move away from a wall
+        bool movingAwayFromLeftWall = (isAtLeftWall && handOffset > 0.01f);
+        bool movingAwayFromRightWall = (isAtRightWall && handOffset < -0.01f);
+
+        if ((!isAtLeftWall && !isAtRightWall) || movingAwayFromLeftWall || movingAwayFromRightWall)
+        {
+            // We're not at a wall or moving away from it, so apply regular movement
+            Vector3 newPosition = new Vector3(
+                Mathf.Lerp(transform.position.x, targetX, smoothingFactor),
+                transform.position.y,
+                transform.position.z
+            );
+
+            transform.position = newPosition;
+            lastValidPosition = newPosition;
+        }
+        else
+        {
+            // We're at a wall and trying to go further in that direction - snap exactly to the wall
+            if (isAtLeftWall)
+            {
+                transform.position = new Vector3(minX, transform.position.y, transform.position.z);
+            }
+            else if (isAtRightWall)
+            {
+                transform.position = new Vector3(maxX, transform.position.y, transform.position.z);
+            }
+        }
+
+        // Log information periodically
         if (shouldLog)
         {
-            float percentToEdge = Mathf.Abs((targetX - centerX) / ((maxX - minX) / 2f)) * 100f;
             Debug.Log($"Hand offset: {handOffset:F4}, Scaled: {scaledOffset:F2}, " +
-                     $"Target X: {targetX:F4}, Percent to edge: {percentToEdge:F1}%");
+                     $"At Left Wall: {isAtLeftWall}, At Right Wall: {isAtRightWall}");
         }
 
         // Trigger event
@@ -102,6 +136,8 @@ public class Character_NewGame : NetworkBehaviour
         canMove = true;
         isInitialized = false;
         frameCount = 0;
+        isAtLeftWall = false;
+        isAtRightWall = false;
     }
 
     public void GameOver()
@@ -115,6 +151,8 @@ public class Character_NewGame : NetworkBehaviour
         Debug.Log("Spawning cube");
         canMove = false;
         isInitialized = false;
+        isAtLeftWall = false;
+        isAtRightWall = false;
 
         // Reset position to center
         transform.position = new Vector3(

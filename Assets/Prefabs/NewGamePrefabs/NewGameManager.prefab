@@ -417,21 +417,26 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   obstaclePrefab: {fileID: 1750598833352266042, guid: 545dfeb8674377a42bce2f683dd45034, type: 3}
+  collectiblePrefab: {fileID: 6876682746856611867, guid: c75dea92ea8768f4c9c71148a7290b4a, type: 3}
+  activeObjects: []
+  obstacleFallSpeed: 2
+  collectibleFallSpeed: 2.5
   obstacleSpawnInterval: 3
-  obstacleSpawnRangeX: 5
-  obstacleSpawnY: 10
-  obstaclesInstances: []
+  collectibleSpawnInterval: 1.5
+  objectSpawnRangeX: 5
+  objectSpawnY: 10
   initialButtons: {fileID: 2566665300545572651}
   inGameBackButton: {fileID: 8459340216251620434}
   endgameInfo: {fileID: 5881575536552786249}
   movementSpeed: 2
+  isCollectionMode: 0
+  gameTimeLimit: 10
+  waitAfterDeath: 1
   character: {fileID: 5615851799698733297}
   scoreText: {fileID: 2783230211383033144}
   endgameScoreText: {fileID: 4499558253332574733}
   endgameHighScoreText: {fileID: 7037428679258922479}
-  waitAfterDeath: 1
   score: 0
-  hasObstacles: 1
   OnGameStart:
     m_PersistentCalls:
       m_Calls: []
@@ -1091,12 +1096,13 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  moveSpeed: 5
-  controllingHandIsLeft: 0
   minX: -5
   maxX: 5
-  spawnPoint: {fileID: 8959768148359979864}
-  OnGestureDetected:
+  handMovementScale: 50
+  smoothingFactor: 0.05
+  wallBuffer: 0.05
+  controllingHandIsLeft: 0
+  OnHandPositionUpdated:
     m_PersistentCalls:
       m_Calls: []
 --- !u!65 &2566739834563150072
@@ -1142,7 +1148,7 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
+  m_UseGravity: 0
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
@@ -1297,7 +1303,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2357655176070829164, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: OnButtonPress.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: ReturnToEndlessRunnerMenu
+      value: ReturnToMenu
       objectReference: {fileID: 0}
     - target: {fileID: 2357655176070829164, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: OnButtonPress.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName

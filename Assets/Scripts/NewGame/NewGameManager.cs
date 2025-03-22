@@ -10,61 +10,70 @@ public class NewGameManager : NetworkBehaviour
 {
     public static NewGameManager Instance;
 
-    [Header("Obstacle Settings")]
-    [SerializeField] private GameObject obstaclePrefab; // Assign the Obstacle prefab here
-    [SerializeField] private float obstacleSpawnInterval = 2f; // Time between spawns
-    [SerializeField] private float obstacleSpawnRangeX = 5f; // Horizontal range for spawning
-    [SerializeField] private float obstacleSpawnY = 10f; // Y position to spawn obstacles
-    [SerializeField] private List<GameObject> obstaclesInstances; // Keep track of spawned obstacles
+    [Header("Object Settings")]
+    [SerializeField] private GameObject obstaclePrefab;
+    [SerializeField] private GameObject collectiblePrefab;
+    [SerializeField] private List<GameObject> activeObjects; // Keep track of all spawned objects
+
+    // SINGLE PLACE to define speeds - only place they're defined in the codebase
+    [Header("Speed Settings")]
+    [SerializeField] private float obstacleFallSpeed = 0.8f;
+    [SerializeField] private float collectibleFallSpeed = 1.2f;
+    // Public getters so other scripts can access but not modify these values
+    public float ObstacleFallSpeed => obstacleFallSpeed;
+    public float CollectibleFallSpeed => collectibleFallSpeed;
+
+    [Header("Spawn Settings")]
+    [SerializeField] private float obstacleSpawnInterval = 4f;
+    [SerializeField] private float collectibleSpawnInterval = 2f;
+    [SerializeField] private float objectSpawnRangeX = 5f;
+    [SerializeField] private float objectSpawnY = 10f;
 
     [Header("UI Elements")]
-    [SerializeField] private GameObject initialButtons; // Contains Back, Repeat, Switch Hands
-    [SerializeField] private GameObject inGameBackButton; // Single Back button during game
-    [SerializeField] private GameObject endgameInfo; // Endgame UI panel
+    [SerializeField] private GameObject initialButtons;
+    [SerializeField] private GameObject inGameBackButton;
+    [SerializeField] private GameObject endgameInfo;
 
     [Header("Game Settings")]
     [SerializeField] private float movementSpeed = 2.00f;
+    [SerializeField] private bool isCollectionMode = false;
+    [SerializeField] private float gameTimeLimit = 60f;
+    [SerializeField] private float waitAfterDeath = 2f;
 
     [Header("References")]
     [SerializeField] private Character_NewGame character;
-    [SerializeField] private TextMeshPro scoreText; // In-game score display
-
-    [Header("Endgame UI Elements")]
-    [SerializeField] private TextMeshPro endgameScoreText; // Separate Score Text
-    [SerializeField] private TextMeshPro endgameHighScoreText; // Separate High Score Text
-
-    [SerializeField] private float waitAfterDeath = 2f;
+    [SerializeField] private TextMeshPro scoreText;
+    [SerializeField] private TextMeshPro endgameScoreText;
+    [SerializeField] private TextMeshPro endgameHighScoreText;
 
     private GameMenuManager menuManager;
-
     private bool gameRunning = false;
+    private float gameTimer = 0f;
+    private Coroutine spawnCoroutine;
 
     public float score = 0f;
-    public bool hasObstacles = false; // No obstacles for now
     public UnityEvent OnGameStart;
     public UnityEvent OnGameEnd;
 
-    // ======= Highscore Logic =======
+    // Highscore properties for different game modes
     private float Highscore
     {
         get
         {
-            if (hasObstacles)
-                return PlayerPrefs.GetFloat("HighscoreWithObstacles", 0f);
+            if (isCollectionMode)
+                return PlayerPrefs.GetFloat("HighscoreCollection", 0f);
             else
-                return PlayerPrefs.GetFloat("HighscoreWithoutObstacles", 0f);
+                return PlayerPrefs.GetFloat("HighscoreObstacles", 0f);
         }
         set
         {
-            if (hasObstacles)
-                PlayerPrefs.SetFloat("HighscoreWithObstacles", value);
+            if (isCollectionMode)
+                PlayerPrefs.SetFloat("HighscoreCollection", value);
             else
-                PlayerPrefs.SetFloat("HighscoreWithoutObstacles", value);
+                PlayerPrefs.SetFloat("HighscoreObstacles", value);
             PlayerPrefs.Save();
         }
     }
-
-    private Coroutine obstacleSpawningCoroutine; // Reference to the obstacle spawning coroutine
 
     private void Awake()
     {
@@ -74,6 +83,7 @@ public class NewGameManager : NetworkBehaviour
             return;
         }
         Instance = this;
+        activeObjects = new List<GameObject>();
     }
 
     private void Start()
@@ -83,13 +93,13 @@ public class NewGameManager : NetworkBehaviour
         // Set up UI toggles for game start/end
         OnGameEnd.AddListener(() =>
         {
-            Debug.Log("OnGameEnd invoked: Showing initial buttons, hiding in-game back button");
+            Debug.Log("OnGameEnd invoked - showing UI buttons");
             initialButtons.SetActive(true);
             inGameBackButton.SetActive(false);
         });
         OnGameStart.AddListener(() =>
         {
-            Debug.Log("OnGameStart invoked: Hiding initial buttons, showing in-game back button");
+            Debug.Log("OnGameStart invoked - hiding UI buttons");
             initialButtons.SetActive(false);
             inGameBackButton.SetActive(true);
         });
@@ -97,19 +107,9 @@ public class NewGameManager : NetworkBehaviour
 
         if (!isServer) return;
 
-        obstaclesInstances = new List<GameObject>();
-
-        // Make sure the character reference is valid
-        if (character == null)
-        {
-            Debug.LogError("Character reference is missing in NewGameManager!");
-            return;
-        }
-
         // Set up gesture detection to start the game
         if (GestureDetector.Instance != null)
         {
-            // Remove any existing listeners to avoid duplicates
             GestureDetector.Instance.OnGestureBegin.RemoveListener(OnGestureDetectedHandler);
             GestureDetector.Instance.OnGestureBegin.AddListener(OnGestureDetectedHandler);
 
@@ -123,22 +123,18 @@ public class NewGameManager : NetworkBehaviour
                 character.controllingHandIsLeft = !character.controllingHandIsLeft;
                 GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
                 GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
-                Debug.Log("Right hand disabled: switched controlling hand");
             }
-
-            // Debug which hand is controlling
-            Debug.Log("Controlling hand is " + (character.controllingHandIsLeft ? "LEFT" : "RIGHT"));
         }
         else
         {
-            Debug.LogError("GestureDetector.Instance is null. Ensure it is correctly set up.");
+            Debug.LogError("GestureDetector.Instance is null");
         }
 
-        // Start with default cube position
+        // Position character
         character.Spawn();
 
-        // Load the existing highscore at the beginning of the game
-        LoadHighscore();
+        // Log highscore
+        Debug.Log($"Current highscore: {Highscore}");
 
         // Play instructions if needed
         StartCoroutine(PlayInstructions());
@@ -146,35 +142,16 @@ public class NewGameManager : NetworkBehaviour
 
     private IEnumerator PlayInstructions()
     {
-        string mode = hasObstacles ? "Obstacles" : "Screws";
         yield return null;
-        // Uncomment below if you want to play audio instructions
-        // yield return new WaitForSeconds(AudioManager.Instance.PlayInstruction("InstructionsNewGame" + mode));
-        // yield return new WaitForSeconds(AudioManager.Instance.PlayInstruction("InstructionsNewGameEnd"));
+        // Add your audio instructions here if needed
     }
 
-    /// <summary>
-    /// Load the highscore from PlayerPrefs
-    /// </summary>
-    private void LoadHighscore()
-    {
-        // No need to reset the highscore, just log it for debugging
-        Debug.Log($"Current highscore: {Highscore}");
-    }
-
-    /// <summary>
-    /// Handler invoked when a gesture is detected.
-    /// Starts the game if not already running and endgame UI is not active.
-    /// </summary>
     private void OnGestureDetectedHandler(GestureType gesture, bool isLeft)
     {
-        // Check if this is the controlling hand
-        bool isControllingHand = (character.controllingHandIsLeft == isLeft);
-
-        // Start game if not already running and if it's the controlling hand
-        if (!gameRunning && !endgameInfo.activeSelf && isControllingHand)
+        // Start game on any gesture if not already running
+        if (!gameRunning && !endgameInfo.activeSelf)
         {
-            Debug.Log($"Gesture detected from controlling hand: {gesture}");
+            Debug.Log($"Starting game with gesture: {gesture}");
             StartGame();
         }
     }
@@ -183,16 +160,39 @@ public class NewGameManager : NetworkBehaviour
     {
         if (!gameRunning) return;
 
-        score += movementSpeed * Time.fixedDeltaTime;
-        ChangeScore(Mathf.RoundToInt(score)); // Round the score
+        if (isCollectionMode)
+        {
+            // Update timer for collection mode
+            gameTimer += Time.fixedDeltaTime;
+
+            // Check if time limit reached
+            if (gameTimer >= gameTimeLimit)
+            {
+                EndGame();
+                return;
+            }
+
+            // Update UI with remaining time
+            UpdateTimeDisplay(gameTimeLimit - gameTimer);
+        }
+        else
+        {
+            // In obstacle mode, score increases over time
+            score += movementSpeed * Time.fixedDeltaTime;
+            ChangeScore(Mathf.RoundToInt(score));
+        }
     }
 
     private void OnDestroy()
     {
+        // Clean up all spawned objects
         if (isServer)
         {
-            foreach (var o in obstaclesInstances)
-                NetworkServer.Destroy(o);
+            foreach (var obj in activeObjects)
+            {
+                if (obj != null)
+                    NetworkServer.Destroy(obj);
+            }
         }
 
         // Remove gesture listener
@@ -205,8 +205,27 @@ public class NewGameManager : NetworkBehaviour
     [ClientRpc]
     public void EndGame()
     {
-        Debug.Log("End game");
+        Debug.Log("End game called - stopping all coroutines");
+
+        // It's important to stop ALL coroutines to ensure spawning stops
         StopAllCoroutines();
+
+        // Stop any specific spawn coroutine
+        if (spawnCoroutine != null)
+        {
+            StopCoroutine(spawnCoroutine);
+            spawnCoroutine = null;
+        }
+
+        // Immediately disable movement in character
+        if (character != null)
+        {
+            character.GameOver();
+        }
+
+        // Immediately set game state to not running
+        gameRunning = false;
+
         StartCoroutine(EndGameCoroutine());
     }
 
@@ -214,32 +233,42 @@ public class NewGameManager : NetworkBehaviour
     {
         if (isServer && gameRunning)
         {
-            character.GameOver();
+            Debug.Log("EndGameCoroutine started");
+
+            // Set game state to not running immediately
             gameRunning = false;
 
+            // Stop player movement
+            character.GameOver();
+
+            // Set the character to not be controlled by hands
             if (GestureDetector.Instance != null)
             {
                 GestureDetector.Instance.handL.SetControllingHand(false);
                 GestureDetector.Instance.handR.SetControllingHand(false);
             }
 
-            Debug.Log("End game coroutine started");
-            yield return new WaitForSeconds(waitAfterDeath);
-            Debug.Log("End game coroutine after wait");
+            // Destroy all active objects to immediately stop them
+            foreach (var obj in activeObjects)
+            {
+                if (obj != null)
+                    NetworkServer.Destroy(obj);
+            }
+            activeObjects.Clear();
 
-            // Only update the highscore if the current score is higher
+            yield return new WaitForSeconds(waitAfterDeath);
+
+            // Update highscore if needed
             if (Highscore < score)
             {
-                Debug.Log($"New highscore achieved! Old: {Highscore}, New: {score}");
+                Debug.Log($"New highscore: {score}");
                 Highscore = score;
             }
-            else
-            {
-                Debug.Log($"Score: {score}, Highscore remains: {Highscore}");
-            }
 
-            Debug.Log($"Highscore updated to: {Highscore}");
+            // Make sure score is updated before showing end screen
+            ChangeScore(Mathf.RoundToInt(score));
 
+            // Show end game UI with scores
             DisplayEndGameInfo(true);
 
             // Log game data
@@ -247,26 +276,46 @@ public class NewGameManager : NetworkBehaviour
             {
                 LoggerCommunicationProvider.Instance.AddToCustomData("newgame_score", "\"" + score.ToString() + "\"");
                 LoggerCommunicationProvider.Instance.AddToCustomData("newgame_highscore", "\"" + Highscore.ToString() + "\"");
+                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode",
+                    isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
                 LoggerCommunicationProvider.Instance.StopLogging();
             }
         }
+
+        // Invoke the game end event to update UI
+        Debug.Log("Invoking OnGameEnd");
         OnGameEnd.Invoke();
     }
 
     [ClientRpc]
     private void DisplayEndGameInfo(bool display)
     {
-        Debug.Log("END GAME INFO = " + display.ToString());
+        Debug.Log("DisplayEndGameInfo: " + display);
         endgameInfo.SetActive(display);
+
         if (!display) return;
 
+        // Set the score text - make sure it's not null first
         if (endgameScoreText != null)
+        {
             endgameScoreText.text = Mathf.RoundToInt(score).ToString();
+            Debug.Log("Set endgame score text to: " + endgameScoreText.text);
+        }
+        else
+        {
+            Debug.LogError("endgameScoreText is null!");
+        }
 
+        // Set the highscore text - make sure it's not null first
         if (endgameHighScoreText != null)
+        {
             endgameHighScoreText.text = Mathf.RoundToInt(Highscore).ToString();
-
-        Debug.Log($"Displayed Score: {endgameScoreText.text}, Highscore: {endgameHighScoreText.text}");
+            Debug.Log("Set endgame highscore text to: " + endgameHighScoreText.text);
+        }
+        else
+        {
+            Debug.LogError("endgameHighScoreText is null!");
+        }
     }
 
     [ClientRpc]
@@ -274,105 +323,233 @@ public class NewGameManager : NetworkBehaviour
     {
         Debug.Log("StartGame invoked");
 
-        // Trigger UI changes
         OnGameStart.Invoke();
 
         if (!isServer || gameRunning) return;
 
-        // Ensure character reference is valid
-        if (character == null)
-        {
-            Debug.LogError("Character reference is missing in StartGame!");
-            return;
-        }
-
-        // Double-check GestureDetector is available
-        if (GestureDetector.Instance == null)
-        {
-            Debug.LogError("GestureDetector.Instance is null in StartGame!");
-            return;
-        }
-
-        // Set game state to running
+        // Reset game state
         gameRunning = true;
         score = 0;
+        gameTimer = 0f;
         ChangeScore(0);
 
-        // Start obstacle spawning if enabled
-        if (hasObstacles && obstaclePrefab != null)
+        // Kill any existing spawning coroutine
+        if (spawnCoroutine != null)
         {
-            if (obstacleSpawningCoroutine != null)
-                StopCoroutine(obstacleSpawningCoroutine);
-            obstacleSpawningCoroutine = StartCoroutine(SpawnObstacles());
+            StopCoroutine(spawnCoroutine);
         }
 
-        // Initialize movement on the character
-        Debug.Log("Telling character to start movement");
+        // Start appropriate spawning routine
+        if (isCollectionMode)
+        {
+            if (collectiblePrefab != null)
+            {
+                spawnCoroutine = StartCoroutine(SpawnCollectibles());
+                Debug.Log("Started collectible spawning coroutine");
+            }
+            else
+            {
+                Debug.LogError("Collectible prefab is not assigned!");
+            }
+        }
+        else
+        {
+            if (obstaclePrefab != null)
+            {
+                spawnCoroutine = StartCoroutine(SpawnObstacles());
+                Debug.Log("Started obstacle spawning coroutine");
+            }
+            else
+            {
+                Debug.LogError("Obstacle prefab is not assigned!");
+            }
+        }
+
+        // Start character movement
         character.StartMovement();
 
-        // Log the start of a new game
+        // Log game start
         if (LoggerCommunicationProvider.Instance != null)
         {
             LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
-            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode", hasObstacles ? "\"With obstacles\"" : "\"Without obstacles\"");
+            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode",
+                isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
         }
     }
 
     private IEnumerator SpawnObstacles()
     {
+        Debug.Log("SpawnObstacles coroutine started");
+        yield return new WaitForSeconds(1.0f); // Initial delay
+
+        // Keep spawning as long as game is running
         while (gameRunning)
         {
-            SpawnObstacle();
+            SpawnObject(obstaclePrefab, "Obstacle");
             yield return new WaitForSeconds(obstacleSpawnInterval);
+
+            // Double check game is still running
+            if (!gameRunning)
+            {
+                Debug.Log("Game no longer running - stopping obstacle spawning");
+                yield break;
+            }
         }
+
+        Debug.Log("SpawnObstacles coroutine exited");
+    }
+
+    private IEnumerator SpawnCollectibles()
+    {
+        Debug.Log("SpawnCollectibles coroutine started");
+        yield return new WaitForSeconds(0.5f); // Initial delay
+
+        // Keep spawning as long as game is running
+        while (gameRunning)
+        {
+            SpawnObject(collectiblePrefab, "Collectible");
+            yield return new WaitForSeconds(collectibleSpawnInterval);
+
+            // Double check game is still running
+            if (!gameRunning)
+            {
+                Debug.Log("Game no longer running - stopping collectible spawning");
+                yield break;
+            }
+        }
+
+        Debug.Log("SpawnCollectibles coroutine exited");
     }
 
     [Server]
-    private void SpawnObstacle()
+    private void SpawnObject(GameObject prefab, string objectType)
     {
+        // Additional check to ensure we don't spawn after game over
+        if (!gameRunning)
+        {
+            Debug.Log("Attempted to spawn object after game ended - ignoring");
+            return;
+        }
+
+        // Calculate random position
         Vector3 spawnPosition = new Vector3(
-            Random.Range(-obstacleSpawnRangeX, obstacleSpawnRangeX),
-            obstacleSpawnY,
+            Random.Range(-objectSpawnRangeX, objectSpawnRangeX),
+            objectSpawnY,
             12f
         );
 
-        GameObject obstacle = Instantiate(obstaclePrefab, spawnPosition, Quaternion.identity);
-        NetworkServer.Spawn(obstacle);
-        obstaclesInstances.Add(obstacle);
+        // Instantiate the object
+        GameObject obj = Instantiate(prefab, spawnPosition, Quaternion.identity);
 
-        Debug.Log($"Spawned obstacle at {spawnPosition}");
+        // The prefabs should not have their own speeds set - they receive it directly from here
+        // We will check object type and set appropriate speed
+        if (objectType == "Obstacle")
+        {
+            Obstacle_NewGame obstacle = obj.GetComponent<Obstacle_NewGame>();
+            if (obstacle != null)
+            {
+                obstacle.Initialize();
+            }
+        }
+        else if (objectType == "Collectible")
+        {
+            Collectible collectible = obj.GetComponent<Collectible>();
+            if (collectible != null)
+            {
+                collectible.Initialize();
+            }
+        }
+
+        // Spawn on network and track
+        NetworkServer.Spawn(obj);
+        activeObjects.Add(obj);
     }
 
-    public void ReturnToEndlessRunnerMenu()
+    /// <summary>
+    /// Called when a collectible is collected by the player
+    /// </summary>
+    public void CollectItem(int points)
     {
-        EndGame();
-        menuManager.ReturnToGameMenu();
+        if (!isServer || !gameRunning) return;
+
+        // Add points to score
+        score += points;
+        ChangeScore(Mathf.RoundToInt(score));
+
+        // Play sound effect if available
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("CoinPickup");
+        }
+    }
+
+    [ClientRpc]
+    private void UpdateTimeDisplay(float remainingTime)
+    {
+        if (scoreText != null)
+        {
+            // Format remaining time as MM:SS
+            int minutes = Mathf.FloorToInt(remainingTime / 60);
+            int seconds = Mathf.FloorToInt(remainingTime % 60);
+            string timeDisplay = $"{minutes:00}:{seconds:00}";
+
+            // Show both score and time
+            scoreText.text = $"Score: {Mathf.RoundToInt(score)} - Time: {timeDisplay}";
+        }
+    }
+
+    public void ReturnToMenu()
+    {
+        Debug.Log("ReturnToMenu called");
+
+        // Make sure game is ended
+        if (gameRunning)
+        {
+            EndGame();
+        }
+
+        // Return to menu
+        if (menuManager != null)
+        {
+            menuManager.ReturnToGameMenu();
+        }
+        else
+        {
+            Debug.LogError("menuManager is null!");
+        }
     }
 
     public void RestartGame()
     {
         if (!isServer) return;
 
-        foreach (var o in obstaclesInstances)
-            NetworkServer.Destroy(o);
-        obstaclesInstances.Clear();
+        Debug.Log("RestartGame called");
 
+        // Clean up active objects
+        foreach (var obj in activeObjects)
+        {
+            if (obj != null)
+                NetworkServer.Destroy(obj);
+        }
+        activeObjects.Clear();
+
+        // Reset character and game state
         character.Spawn();
         gameRunning = false;
-
         score = 0f;
-        ChangeScore(Mathf.RoundToInt(score));
+        ChangeScore(0);
 
-        LoadHighscore();
-
+        // Reset hand control
         if (GestureDetector.Instance != null)
         {
             GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
             GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
         }
 
+        // Hide end game UI
         DisplayEndGameInfo(false);
 
+        // Restart game
         StopAllCoroutines();
         StartGame();
     }
@@ -380,14 +557,15 @@ public class NewGameManager : NetworkBehaviour
     [ClientRpc]
     private void ChangeScore(int newScore)
     {
-        if (scoreText != null)
+        if (scoreText != null && !isCollectionMode)
         {
             scoreText.text = newScore.ToString();
-            Debug.Log($"In-game score updated to: {newScore}");
+            Debug.Log("Changed in-game score to: " + newScore);
         }
-        else
+        else if (scoreText != null && isCollectionMode)
         {
-            Debug.LogError("scoreText is not assigned in the Inspector.");
+            // For collection mode, score is part of time display which is handled separately
+            Debug.Log("Updated collection score (will be shown with time): " + newScore);
         }
     }
 
