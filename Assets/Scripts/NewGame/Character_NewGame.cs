@@ -8,8 +8,8 @@ public class Character_NewGame : NetworkBehaviour
     [SerializeField] private float minX = -5f;  // Left boundary for the cube
     [SerializeField] private float maxX = 5f;   // Right boundary for the cube
     [SerializeField] private float handMovementScale = 50.0f; // Much higher multiplier for less hand movement required
-    [SerializeField] private float smoothingFactor = 0.05f; // Lower = smoother movement (0-1)
-    [SerializeField] private float wallBuffer = 0.1f; // Increased buffer distance from wall to prevent jittering
+    [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from wall to prevent jittering
+     private float movementSpeed = 10.0f; // Units per second the cube will move
 
     [Header("Gesture Control")]
     public bool controllingHandIsLeft = false;
@@ -22,8 +22,6 @@ public class Character_NewGame : NetworkBehaviour
     private Vector3 initialHandPosition;
     private bool isInitialized = false;
     private Vector3 lastValidPosition;
-    private bool isAtLeftWall = false;
-    private bool isAtRightWall = false;
 
     // Debugging
     private int frameCount = 0;
@@ -57,51 +55,79 @@ public class Character_NewGame : NetworkBehaviour
         // Calculate offset from initial position
         float handOffset = currentHandPosition.x - initialHandPosition.x;
 
-        // Apply high scaling factor to make small movements go further
-        float scaledOffset = handOffset * handMovementScale;
+        // Apply movement scale and speed multiplier
+        float scaledOffset = handOffset * handMovementScale * movementSpeed;
 
-        // Calculate target position
+        // Calculate target position with center-relative positioning
         float centerX = (minX + maxX) / 2f;
-        float targetX = Mathf.Clamp(centerX + scaledOffset, minX, maxX);
 
-        // Determine if we're at or very near a wall boundary
-        isAtLeftWall = (transform.position.x <= minX + wallBuffer);
-        isAtRightWall = (transform.position.x >= maxX - wallBuffer);
+        // Hard clamp the cube position to prevent going through walls
+        transform.position = new Vector3(
+            Mathf.Clamp(transform.position.x, minX + wallBuffer, maxX - wallBuffer),
+            transform.position.y,
+            transform.position.z
+        );
 
-        // Check if we're trying to move away from a wall
-        bool movingAwayFromLeftWall = (isAtLeftWall && handOffset > 0.01f);
-        bool movingAwayFromRightWall = (isAtRightWall && handOffset < -0.01f);
+        // Calculate target position within allowed boundaries
+        float targetX = Mathf.Clamp(centerX + scaledOffset, minX + wallBuffer, maxX - wallBuffer);
 
-        if ((!isAtLeftWall && !isAtRightWall) || movingAwayFromLeftWall || movingAwayFromRightWall)
+        // Check if we're at a wall boundary and trying to go further
+        bool atLeftWall = transform.position.x <= minX + wallBuffer + 0.01f;
+        bool atRightWall = transform.position.x >= maxX - wallBuffer - 0.01f;
+        bool tryingToGoLeft = targetX < transform.position.x;
+        bool tryingToGoRight = targetX > transform.position.x;
+
+        // Only move if we're not at a wall or we're moving away from the wall
+        if ((!atLeftWall || !tryingToGoLeft) && (!atRightWall || !tryingToGoRight))
         {
-            // We're not at a wall or moving away from it, so apply regular movement
-            Vector3 newPosition = new Vector3(
-                Mathf.Lerp(transform.position.x, targetX, smoothingFactor),
+            // Calculate desired position with full responsiveness to hand movement
+            Vector3 desiredPosition = new Vector3(
+                targetX,
                 transform.position.y,
                 transform.position.z
             );
 
-            transform.position = newPosition;
-            lastValidPosition = newPosition;
-        }
-        else
-        {
-            // We're at a wall and trying to go further in that direction - snap exactly to the wall
-            if (isAtLeftWall)
+            // Calculate the maximum distance we can move this frame based on movementSpeed
+            float maxMoveDistance = movementSpeed * Time.deltaTime;
+
+            // Get the direction to the target
+            Vector3 moveDirection = desiredPosition - transform.position;
+            float distanceToTarget = moveDirection.magnitude;
+
+            // If we're not at the target, move toward it at a controlled speed
+            if (distanceToTarget > 0.001f)
             {
-                transform.position = new Vector3(minX, transform.position.y, transform.position.z);
-            }
-            else if (isAtRightWall)
-            {
-                transform.position = new Vector3(maxX, transform.position.y, transform.position.z);
+                // Normalize direction and multiply by max distance
+                moveDirection.Normalize();
+
+                // Create new position by moving a limited distance toward target
+                Vector3 newPosition = transform.position;
+
+                // Either move the max distance or the full distance if it's smaller
+                if (distanceToTarget <= maxMoveDistance)
+                {
+                    newPosition = desiredPosition;
+                }
+                else
+                {
+                    newPosition += moveDirection * maxMoveDistance;
+                }
+
+                // Final safety clamp to ensure we never go outside bounds
+                newPosition.x = Mathf.Clamp(newPosition.x, minX + wallBuffer, maxX - wallBuffer);
+
+                transform.position = newPosition;
+                lastValidPosition = newPosition;
             }
         }
 
         // Log information periodically
         if (shouldLog)
         {
+            float percentToEdge = Mathf.Abs((transform.position.x - centerX) / ((maxX - minX) / 2f)) * 100f;
             Debug.Log($"Hand offset: {handOffset:F4}, Scaled: {scaledOffset:F2}, " +
-                     $"At Left Wall: {isAtLeftWall}, At Right Wall: {isAtRightWall}");
+                     $"Pos X: {transform.position.x:F2}, At wall: {atLeftWall || atRightWall}, " +
+                     $"Percent to edge: {percentToEdge:F1}%");
         }
 
         // Trigger event
@@ -136,8 +162,19 @@ public class Character_NewGame : NetworkBehaviour
         canMove = true;
         isInitialized = false;
         frameCount = 0;
-        isAtLeftWall = false;
-        isAtRightWall = false;
+    }
+
+    // Method to change the movement speed
+    public void SetMovementSpeed(float newSpeed)
+    {
+        movementSpeed = Mathf.Max(0.1f, newSpeed); // Ensure speed doesn't go below 0.1
+        Debug.Log($"Character movement speed set to: {movementSpeed}");
+    }
+
+    // Get the current movement speed
+    public float GetMovementSpeed()
+    {
+        return movementSpeed;
     }
 
     public void GameOver()
@@ -151,8 +188,6 @@ public class Character_NewGame : NetworkBehaviour
         Debug.Log("Spawning cube");
         canMove = false;
         isInitialized = false;
-        isAtLeftWall = false;
-        isAtRightWall = false;
 
         // Reset position to center
         transform.position = new Vector3(

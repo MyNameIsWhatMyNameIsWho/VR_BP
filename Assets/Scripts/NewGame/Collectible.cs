@@ -1,12 +1,13 @@
 using UnityEngine;
 using Mirror;
 
-public class Collectible : MonoBehaviour
+public class Collectible : NetworkBehaviour
 {
     [SerializeField] private int pointValue = 10;
     [SerializeField] private GameObject collectionEffect;
 
     private float fallSpeed;
+    private bool isCollected = false;
 
     public void Initialize()
     {
@@ -24,7 +25,7 @@ public class Collectible : MonoBehaviour
 
     private void Update()
     {
-        if (!NetworkServer.active) return;
+        if (!isServer || isCollected) return;
 
         // Move the collectible downward
         transform.Translate(Vector3.down * fallSpeed * Time.deltaTime);
@@ -38,15 +39,20 @@ public class Collectible : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!NetworkServer.active) return;
+        if (!isServer || isCollected) return;
 
         if (other.CompareTag("Player"))
         {
+            // Mark as collected to prevent duplicate collection
+            isCollected = true;
+
             // Play collection effect if available
             if (collectionEffect != null)
             {
                 GameObject effect = Instantiate(collectionEffect, transform.position, Quaternion.identity);
                 NetworkServer.Spawn(effect);
+
+                // Auto-destroy the effect after a short delay
                 Destroy(effect, 2f);
             }
 
@@ -59,6 +65,16 @@ public class Collectible : MonoBehaviour
             // Disable the collectible and destroy it
             GetComponent<Collider>().enabled = false;
             GetComponent<Renderer>().enabled = false;
+
+            // Delay actual destruction slightly to ensure effect spawns properly
+            Invoke(nameof(DestroyCollectible), 0.1f);
+        }
+    }
+
+    private void DestroyCollectible()
+    {
+        if (isServer)
+        {
             NetworkServer.Destroy(gameObject);
         }
     }

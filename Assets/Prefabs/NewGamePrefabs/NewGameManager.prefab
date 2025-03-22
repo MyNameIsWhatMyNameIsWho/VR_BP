@@ -419,8 +419,9 @@ MonoBehaviour:
   obstaclePrefab: {fileID: 1750598833352266042, guid: 545dfeb8674377a42bce2f683dd45034, type: 3}
   collectiblePrefab: {fileID: 6876682746856611867, guid: c75dea92ea8768f4c9c71148a7290b4a, type: 3}
   activeObjects: []
-  obstacleFallSpeed: 2
-  collectibleFallSpeed: 2.5
+  obstacleFallSpeed: 5
+  collectibleFallSpeed: 4
+  playerMovementSpeed: 5
   obstacleSpawnInterval: 3
   collectibleSpawnInterval: 1.5
   objectSpawnRangeX: 5
@@ -432,8 +433,9 @@ MonoBehaviour:
   isCollectionMode: 0
   gameTimeLimit: 10
   waitAfterDeath: 1
-  character: {fileID: 5615851799698733297}
+  character: {fileID: 7631030326713354399}
   scoreText: {fileID: 2783230211383033144}
+  timeText: {fileID: 0}
   endgameScoreText: {fileID: 4499558253332574733}
   endgameHighScoreText: {fileID: 7037428679258922479}
   score: 0
@@ -1006,9 +1008,9 @@ GameObject:
   - component: {fileID: 7879236846180023055}
   - component: {fileID: 3820552083188763519}
   - component: {fileID: 921437072749443703}
-  - component: {fileID: 5615851799698733297}
   - component: {fileID: 2566739834563150072}
   - component: {fileID: 7989564692850785100}
+  - component: {fileID: 7631030326713354399}
   m_Layer: 9
   m_Name: Character_cube
   m_TagString: Player
@@ -1081,30 +1083,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &5615851799698733297
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8968236218946665197}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0836c7d6dba35384fb78e9a4bd23d50d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  syncDirection: 0
-  syncMode: 0
-  syncInterval: 0
-  minX: -5
-  maxX: 5
-  handMovementScale: 50
-  smoothingFactor: 0.05
-  wallBuffer: 0.05
-  controllingHandIsLeft: 0
-  OnHandPositionUpdated:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!65 &2566739834563150072
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1148,11 +1126,34 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 0
+  m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &7631030326713354399
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8968236218946665197}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0836c7d6dba35384fb78e9a4bd23d50d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  minX: -5
+  maxX: 5
+  handMovementScale: 40
+  wallBuffer: 0.5
+  controllingHandIsLeft: 0
+  OnHandPositionUpdated:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1001 &4564845428829403798
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1191,7 +1192,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2357655176070829164, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: OnButtonPress.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: ReturnToEndlessRunnerMenu
+      value: ReturnToMenu
       objectReference: {fileID: 0}
     - target: {fileID: 2357655176070829164, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: OnButtonPress.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName

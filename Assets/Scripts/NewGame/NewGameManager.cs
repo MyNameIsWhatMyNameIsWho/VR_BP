@@ -13,12 +13,13 @@ public class NewGameManager : NetworkBehaviour
     [Header("Object Settings")]
     [SerializeField] private GameObject obstaclePrefab;
     [SerializeField] private GameObject collectiblePrefab;
-    [SerializeField] private List<GameObject> activeObjects; // Keep track of all spawned objects
+    [SerializeField] private List<GameObject> activeObjects = new List<GameObject>(); // Keep track of all spawned objects
 
-    // SINGLE PLACE to define speeds - only place they're defined in the codebase
     [Header("Speed Settings")]
     [SerializeField] private float obstacleFallSpeed = 0.8f;
     [SerializeField] private float collectibleFallSpeed = 1.2f;
+    [SerializeField] private float playerMovementSpeed = 1.0f; // Base player movement speed
+
     // Public getters so other scripts can access but not modify these values
     public float ObstacleFallSpeed => obstacleFallSpeed;
     public float CollectibleFallSpeed => collectibleFallSpeed;
@@ -43,6 +44,7 @@ public class NewGameManager : NetworkBehaviour
     [Header("References")]
     [SerializeField] private Character_NewGame character;
     [SerializeField] private TextMeshPro scoreText;
+    [SerializeField] private TextMeshPro timeText;
     [SerializeField] private TextMeshPro endgameScoreText;
     [SerializeField] private TextMeshPro endgameHighScoreText;
 
@@ -50,6 +52,7 @@ public class NewGameManager : NetworkBehaviour
     private bool gameRunning = false;
     private float gameTimer = 0f;
     private Coroutine spawnCoroutine;
+    private bool gameEnding = false; // Flag to prevent multiple EndGame calls
 
     public float score = 0f;
     public UnityEvent OnGameStart;
@@ -97,13 +100,23 @@ public class NewGameManager : NetworkBehaviour
             initialButtons.SetActive(true);
             inGameBackButton.SetActive(false);
         });
+
         OnGameStart.AddListener(() =>
         {
             Debug.Log("OnGameStart invoked - hiding UI buttons");
             initialButtons.SetActive(false);
             inGameBackButton.SetActive(true);
         });
-        endgameInfo.SetActive(false);
+
+        // Ensure endgame UI is hidden at start
+        if (endgameInfo != null)
+        {
+            endgameInfo.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("endgameInfo reference is missing!");
+        }
 
         if (!isServer) return;
 
@@ -148,22 +161,25 @@ public class NewGameManager : NetworkBehaviour
 
     private void OnGestureDetectedHandler(GestureType gesture, bool isLeft)
     {
-        // Start game on any gesture if not already running
-        if (!gameRunning && !endgameInfo.activeSelf)
+        // Check if this is the controlling hand
+        bool isControllingHand = (character.controllingHandIsLeft == isLeft);
+
+        // Start game on any gesture if not already running and not showing endgame
+        if (!gameRunning && !endgameInfo.activeSelf && isControllingHand)
         {
-            Debug.Log($"Starting game with gesture: {gesture}");
+            Debug.Log($"Starting game with gesture: {gesture} from {(isLeft ? "left" : "right")} hand");
             StartGame();
         }
     }
 
-    private void FixedUpdate()
+    private void Update()
     {
         if (!gameRunning) return;
 
         if (isCollectionMode)
         {
             // Update timer for collection mode
-            gameTimer += Time.fixedDeltaTime;
+            gameTimer += Time.deltaTime;
 
             // Check if time limit reached
             if (gameTimer >= gameTimeLimit)
@@ -178,7 +194,7 @@ public class NewGameManager : NetworkBehaviour
         else
         {
             // In obstacle mode, score increases over time
-            score += movementSpeed * Time.fixedDeltaTime;
+            score += movementSpeed * Time.deltaTime;
             ChangeScore(Mathf.RoundToInt(score));
         }
     }
@@ -193,6 +209,7 @@ public class NewGameManager : NetworkBehaviour
                 if (obj != null)
                     NetworkServer.Destroy(obj);
             }
+            activeObjects.Clear();
         }
 
         // Remove gesture listener
@@ -205,9 +222,12 @@ public class NewGameManager : NetworkBehaviour
     [ClientRpc]
     public void EndGame()
     {
-        Debug.Log("End game called - stopping all coroutines");
+        // Prevent multiple EndGame calls
+        if (gameEnding) return;
+        gameEnding = true;
 
-        // It's important to stop ALL coroutines to ensure spawning stops
+        Debug.Log("EndGame called - stopping all coroutines");
+
         StopAllCoroutines();
 
         // Stop any specific spawn coroutine
@@ -217,30 +237,25 @@ public class NewGameManager : NetworkBehaviour
             spawnCoroutine = null;
         }
 
+        // Immediately set game state to not running
+        gameRunning = false;
+
         // Immediately disable movement in character
         if (character != null)
         {
             character.GameOver();
         }
 
-        // Immediately set game state to not running
-        gameRunning = false;
-
+        // Start the end game sequence
         StartCoroutine(EndGameCoroutine());
     }
 
     public IEnumerator EndGameCoroutine()
     {
-        if (isServer && gameRunning)
+        Debug.Log("EndGameCoroutine started");
+
+        if (isServer)
         {
-            Debug.Log("EndGameCoroutine started");
-
-            // Set game state to not running immediately
-            gameRunning = false;
-
-            // Stop player movement
-            character.GameOver();
-
             // Set the character to not be controlled by hands
             if (GestureDetector.Instance != null)
             {
@@ -248,14 +263,15 @@ public class NewGameManager : NetworkBehaviour
                 GestureDetector.Instance.handR.SetControllingHand(false);
             }
 
-            // Destroy all active objects to immediately stop them
-            foreach (var obj in activeObjects)
+            // Clean up all active objects
+            foreach (var obj in activeObjects.ToArray())
             {
                 if (obj != null)
                     NetworkServer.Destroy(obj);
             }
             activeObjects.Clear();
 
+            // Wait for the specified delay
             yield return new WaitForSeconds(waitAfterDeath);
 
             // Update highscore if needed
@@ -265,7 +281,7 @@ public class NewGameManager : NetworkBehaviour
                 Highscore = score;
             }
 
-            // Make sure score is updated before showing end screen
+            // Make sure score is updated
             ChangeScore(Mathf.RoundToInt(score));
 
             // Show end game UI with scores
@@ -291,11 +307,18 @@ public class NewGameManager : NetworkBehaviour
     private void DisplayEndGameInfo(bool display)
     {
         Debug.Log("DisplayEndGameInfo: " + display);
+
+        if (endgameInfo == null)
+        {
+            Debug.LogError("endgameInfo is null!");
+            return;
+        }
+
         endgameInfo.SetActive(display);
 
         if (!display) return;
 
-        // Set the score text - make sure it's not null first
+        // Set the score text
         if (endgameScoreText != null)
         {
             endgameScoreText.text = Mathf.RoundToInt(score).ToString();
@@ -306,7 +329,7 @@ public class NewGameManager : NetworkBehaviour
             Debug.LogError("endgameScoreText is null!");
         }
 
-        // Set the highscore text - make sure it's not null first
+        // Set the highscore text
         if (endgameHighScoreText != null)
         {
             endgameHighScoreText.text = Mathf.RoundToInt(Highscore).ToString();
@@ -329,9 +352,30 @@ public class NewGameManager : NetworkBehaviour
 
         // Reset game state
         gameRunning = true;
+        gameEnding = false;
         score = 0;
         gameTimer = 0f;
         ChangeScore(0);
+
+        // Set initial player movement speed
+        if (character != null)
+        {
+            character.SetMovementSpeed(playerMovementSpeed);
+        }
+
+        // Hide endgame UI if it's visible
+        if (endgameInfo.activeSelf)
+        {
+            DisplayEndGameInfo(false);
+        }
+
+        // Clear any existing objects
+        foreach (var obj in activeObjects.ToArray())
+        {
+            if (obj != null)
+                NetworkServer.Destroy(obj);
+        }
+        activeObjects.Clear();
 
         // Kill any existing spawning coroutine
         if (spawnCoroutine != null)
@@ -441,8 +485,7 @@ public class NewGameManager : NetworkBehaviour
         // Instantiate the object
         GameObject obj = Instantiate(prefab, spawnPosition, Quaternion.identity);
 
-        // The prefabs should not have their own speeds set - they receive it directly from here
-        // We will check object type and set appropriate speed
+        // Initialize with appropriate settings
         if (objectType == "Obstacle")
         {
             Obstacle_NewGame obstacle = obj.GetComponent<Obstacle_NewGame>();
@@ -486,15 +529,20 @@ public class NewGameManager : NetworkBehaviour
     [ClientRpc]
     private void UpdateTimeDisplay(float remainingTime)
     {
-        if (scoreText != null)
+        if (timeText != null)
         {
             // Format remaining time as MM:SS
             int minutes = Mathf.FloorToInt(remainingTime / 60);
             int seconds = Mathf.FloorToInt(remainingTime % 60);
             string timeDisplay = $"{minutes:00}:{seconds:00}";
 
-            // Show both score and time
-            scoreText.text = $"Score: {Mathf.RoundToInt(score)} - Time: {timeDisplay}";
+            timeText.text = timeDisplay;
+
+            // Update score display in collection mode
+            if (scoreText != null && isCollectionMode)
+            {
+                scoreText.text = $"Score: {Mathf.RoundToInt(score)}";
+            }
         }
     }
 
@@ -526,7 +574,7 @@ public class NewGameManager : NetworkBehaviour
         Debug.Log("RestartGame called");
 
         // Clean up active objects
-        foreach (var obj in activeObjects)
+        foreach (var obj in activeObjects.ToArray())
         {
             if (obj != null)
                 NetworkServer.Destroy(obj);
@@ -536,7 +584,9 @@ public class NewGameManager : NetworkBehaviour
         // Reset character and game state
         character.Spawn();
         gameRunning = false;
+        gameEnding = false;
         score = 0f;
+        gameTimer = 0f;
         ChangeScore(0);
 
         // Reset hand control
@@ -560,22 +610,45 @@ public class NewGameManager : NetworkBehaviour
         if (scoreText != null && !isCollectionMode)
         {
             scoreText.text = newScore.ToString();
-            Debug.Log("Changed in-game score to: " + newScore);
         }
         else if (scoreText != null && isCollectionMode)
         {
-            // For collection mode, score is part of time display which is handled separately
-            Debug.Log("Updated collection score (will be shown with time): " + newScore);
+            scoreText.text = $"Score: {newScore}";
+        }
+        else
+        {
+            Debug.LogWarning("scoreText is null, can't update score");
         }
     }
 
     public void SwitchHands()
     {
+        if (GestureDetector.Instance == null ||
+            GestureDetector.Instance.handL == null ||
+            GestureDetector.Instance.handR == null)
+        {
+            Debug.LogError("GestureDetector or hands are null");
+            return;
+        }
+
         if (GestureDetector.Instance.handL.IsDisabled || GestureDetector.Instance.handR.IsDisabled)
             return;
 
         character.controllingHandIsLeft = !character.controllingHandIsLeft;
         GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
         GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
+
+        Debug.Log($"Switched controlling hand to {(character.controllingHandIsLeft ? "LEFT" : "RIGHT")}");
+    }
+
+    // Method to change player movement speed
+    public void ChangePlayerSpeed(float newSpeed)
+    {
+        playerMovementSpeed = Mathf.Max(0.1f, newSpeed);
+        if (character != null && gameRunning)
+        {
+            character.SetMovementSpeed(playerMovementSpeed);
+            Debug.Log($"Player speed changed to: {playerMovementSpeed}");
+        }
     }
 }

@@ -1,9 +1,10 @@
 using UnityEngine;
 using Mirror;
 
-public class Obstacle_NewGame : MonoBehaviour
+public class Obstacle_NewGame : NetworkBehaviour
 {
     private float fallSpeed;
+    private bool hasCollided = false;
 
     public void Initialize()
     {
@@ -21,7 +22,7 @@ public class Obstacle_NewGame : MonoBehaviour
 
     private void Update()
     {
-        if (!NetworkServer.active) return;
+        if (!isServer || hasCollided) return;
 
         // Move the obstacle downward
         transform.Translate(Vector3.down * fallSpeed * Time.deltaTime);
@@ -35,10 +36,15 @@ public class Obstacle_NewGame : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (!NetworkServer.active) return;
+        if (!isServer || hasCollided) return;
 
         if (collision.gameObject.CompareTag("Player"))
         {
+            Debug.Log("Obstacle collided with Player.");
+
+            // Mark as collided to prevent further movement and multiple collisions
+            hasCollided = true;
+
             // Disable the collider immediately to prevent jittering
             GetComponent<Collider>().enabled = false;
 
@@ -51,10 +57,14 @@ public class Obstacle_NewGame : MonoBehaviour
                 rb.angularVelocity = Vector3.zero;
             }
 
-            // End the game
+            // End the game via NewGameManager
             if (NewGameManager.Instance != null)
             {
                 NewGameManager.Instance.EndGame();
+            }
+            else
+            {
+                Debug.LogError("NewGameManager instance is null on collision.");
             }
         }
     }
