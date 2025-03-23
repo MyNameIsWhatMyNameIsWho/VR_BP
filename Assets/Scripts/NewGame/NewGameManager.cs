@@ -76,23 +76,29 @@ public class NewGameManager : NetworkBehaviour
     public UnityEvent OnGameStart;
     public UnityEvent OnGameEnd;
 
+    // Static variables that reset when the game restarts
+    private static float sessionHighscoreCollection = 0f;
+    private static float sessionHighscoreObstacles = 0f;
+
     // Highscore properties for different game modes
     private float Highscore
     {
         get
         {
             if (isCollectionMode)
-                return PlayerPrefs.GetFloat("HighscoreCollection", 0f);
+                return sessionHighscoreCollection;
             else
-                return PlayerPrefs.GetFloat("HighscoreObstacles", 0f);
+                return sessionHighscoreObstacles;
         }
         set
         {
             if (isCollectionMode)
-                PlayerPrefs.SetFloat("HighscoreCollection", value);
+                sessionHighscoreCollection = value;
             else
-                PlayerPrefs.SetFloat("HighscoreObstacles", value);
-            PlayerPrefs.Save();
+                sessionHighscoreObstacles = value;
+
+            // Optional debug log
+            Debug.Log($"New highscore set: {value} for {(isCollectionMode ? "Collection" : "Obstacles")} mode");
         }
     }
 
@@ -636,7 +642,7 @@ public class NewGameManager : NetworkBehaviour
             // Update score display in collection mode
             if (scoreText != null && isCollectionMode)
             {
-                scoreText.text = $"Score: {Mathf.RoundToInt(score)}";
+                scoreText.text = $"{Mathf.RoundToInt(score)}";
             }
         }
     }
@@ -716,7 +722,7 @@ public class NewGameManager : NetworkBehaviour
         }
         else if (scoreText != null && isCollectionMode)
         {
-            scoreText.text = $"Score: {newScore}";
+            scoreText.text = $"{newScore}";
         }
         else
         {
