@@ -432,6 +432,12 @@ public class NewGameManager : NetworkBehaviour
         gameTimer = 0f;
         ChangeScore(0);
 
+        // Set time text visibility based on game mode
+        if (timeText != null)
+        {
+            timeText.gameObject.SetActive(isCollectionMode);
+        }
+
         // Set initial player movement speed
         if (character != null)
         {
@@ -680,7 +686,6 @@ public class NewGameManager : NetworkBehaviour
             adaptiveSpawner.ResetTracking();
         }
 
-        // The rest of your existing RestartGame method...
         // Clean up active objects
         foreach (var obj in activeObjects.ToArray())
         {
@@ -707,6 +712,10 @@ public class NewGameManager : NetworkBehaviour
 
         // Hide end game UI
         DisplayEndGameInfo(false);
+
+        // Hide initial buttons, show only in-game back button during calibration
+        initialButtons.SetActive(false);
+        inGameBackButton.SetActive(true);
 
         // Don't start the game yet - wait for calibration gesture
         StopAllCoroutines();

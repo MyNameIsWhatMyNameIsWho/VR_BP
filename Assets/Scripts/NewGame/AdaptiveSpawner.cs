@@ -20,6 +20,8 @@ public class AdaptiveSpawner : NetworkBehaviour
     [SerializeField] private float problemAreaProbability = 0.85f; // Probability to spawn in problem area (0-1)
     [SerializeField] private float problemAreaExtraProbabilityPerMiss = 0.05f; // Extra probability per consecutive miss
     [SerializeField] private int maxConsecutiveMissesTracked = 5; // Cap for increasing difficulty
+    [SerializeField] private int unreachableMissLimit = 3; // How many consecutive misses before considering a position unreachable
+    [SerializeField] private float maxSpawnDistanceFromLast = 0.5f; // Maximum fractional distance to spawn from last position (0-1)
 
     // Collection tracking
     private class CollectibleInfo
@@ -30,10 +32,16 @@ public class AdaptiveSpawner : NetworkBehaviour
     }
     private List<CollectibleInfo> activeCollectibles = new List<CollectibleInfo>();
 
+    // Tracking for unreachable areas
+    private Dictionary<int, int> positionMissCounter = new Dictionary<int, int>();
+    private List<int> unreachablePositions = new List<int>();
+    private const int positionGridSize = 10; // Divide the play area into this many segments
+
     // Normalized range values
     private float normalizedMinX;
     private float normalizedMaxX;
     private float wallBuffer;
+    private float lastSpawnX;
 
     // Tracking variables
     private int consecutiveLeftMisses = 0;
@@ -52,6 +60,7 @@ public class AdaptiveSpawner : NetworkBehaviour
         normalizedMinX = gameManager.GetMinX();
         normalizedMaxX = gameManager.GetMaxX();
         wallBuffer = gameManager.GetWallBuffer();
+        lastSpawnX = normalizedMinX + (normalizedMaxX - normalizedMinX) * 0.5f; // Start in the center
     }
 
     private void Update()
@@ -62,10 +71,27 @@ public class AdaptiveSpawner : NetworkBehaviour
         progressiveDifficultyFactor = Mathf.Min(progressiveDifficultyFactor + progressionRate * Time.deltaTime, maxProgressiveDifficulty);
 
         // Check for collectibles that have gone out of bounds
-        //ProcessOutOfBoundsCollectibles();
+        ProcessOutOfBoundsCollectibles();
     }
 
-    
+    /// <summary>
+    /// Check for collectibles that have moved below the play area and mark them as missed
+    /// </summary>
+    private void ProcessOutOfBoundsCollectibles()
+    {
+        //bool needsUpdate = false;
+
+        for (int i = activeCollectibles.Count - 1; i >= 0; i--)
+        {
+            var collectible = activeCollectibles[i];
+
+            // Already processed or collected
+            if (collectible.isOutOfBounds || collectible.isCollected) continue;
+
+            // The actual out-of-bounds checking is now handled by the Collectible's OnDestroy
+            // This method is mainly kept for possible future enhancements
+        }
+    }
 
     /// <summary>
     /// Generates a spawn position for an obstacle based on current player position
@@ -91,6 +117,10 @@ public class AdaptiveSpawner : NetworkBehaviour
     {
         float xPos;
         float totalRange = normalizedMaxX - normalizedMinX;
+
+        // Current player position (use this to avoid spawning too far from player)
+        Vector3 playerPos = character.transform.position;
+        float playerNormalizedX = (playerPos.x - normalizedMinX) / totalRange;
 
         // Simple probability-based spawning
         float rand = Random.value;
@@ -137,8 +167,8 @@ public class AdaptiveSpawner : NetworkBehaviour
                 // Smallest chance to spawn on opposite side to check if patient can reach
                 else
                 {
-                    xPos = normalizedMinX + totalRange * 0.75f; // Right
-                    Debug.Log("Testing patient RIGHT side reach");
+                    xPos = normalizedMinX + totalRange * 0.65f; // Right (but not extreme right)
+                    Debug.Log("Testing patient RIGHT side reach (moderate)");
                 }
             }
             else // Right side struggle
@@ -163,8 +193,8 @@ public class AdaptiveSpawner : NetworkBehaviour
                 // Smallest chance to spawn on opposite side to check if patient can reach
                 else
                 {
-                    xPos = normalizedMinX + totalRange * 0.25f; // Left
-                    Debug.Log("Testing patient LEFT side reach");
+                    xPos = normalizedMinX + totalRange * 0.35f; // Left (but not extreme left)
+                    Debug.Log("Testing patient LEFT side reach (moderate)");
                 }
             }
         }
@@ -172,34 +202,77 @@ public class AdaptiveSpawner : NetworkBehaviour
         else
         {
             // Get the previous spawn position if we have active collectibles
-            float lastX = 0.5f; // Default to center
-            if (activeCollectibles.Count > 0)
-            {
-                lastX = (activeCollectibles[activeCollectibles.Count - 1].xPosition - normalizedMinX) / totalRange;
-            }
+            float lastX = (lastSpawnX - normalizedMinX) / totalRange; // Normalized last spawn position
 
             // Basic random distribution across the play area
             // But avoid spawning multiple collectibles in same area to encourage movement
             if (lastX < 0.33f)
             {
-                // Last one was on left, so prefer center or right
-                xPos = normalizedMinX + totalRange * (0.4f + Random.value * 0.6f);
-                Debug.Log("Last was LEFT, now spawning center/right");
+                // Last one was on left, so prefer center or moderate right
+                // Avoid spawning extreme left to extreme right (too difficult)
+                xPos = normalizedMinX + totalRange * (0.4f + Random.value * 0.4f);
+                Debug.Log("Last was LEFT, now spawning center/moderate-right");
             }
             else if (lastX > 0.66f)
             {
-                // Last one was on right, so prefer left or center
-                xPos = normalizedMinX + totalRange * Random.value * 0.6f;
-                Debug.Log("Last was RIGHT, now spawning left/center");
+                // Last one was on right, so prefer center or moderate left
+                // Avoid spawning extreme right to extreme left (too difficult)
+                xPos = normalizedMinX + totalRange * (0.2f + Random.value * 0.4f);
+                Debug.Log("Last was RIGHT, now spawning moderate-left/center");
             }
             else
             {
-                // Last one was in center, so go to either side
-                xPos = Random.value < 0.5f ?
-                    normalizedMinX + totalRange * Random.value * 0.3f : // Left side
-                    normalizedMinX + totalRange * (0.7f + Random.value * 0.3f); // Right side
-                Debug.Log("Last was CENTER, now spawning on a side");
+                // Last one was in center, so go to either moderate side
+                // Avoid extreme positions that might be unreachable
+                if (Random.value < 0.5f)
+                {
+                    xPos = normalizedMinX + totalRange * (0.2f + Random.value * 0.2f); // Moderate left
+                    Debug.Log("Last was CENTER, now spawning moderate left");
+                }
+                else
+                {
+                    xPos = normalizedMinX + totalRange * (0.6f + Random.value * 0.2f); // Moderate right
+                    Debug.Log("Last was CENTER, now spawning moderate right");
+                }
             }
+        }
+
+        // Now apply distance constraint to prevent too large jumps
+        float targetXPos = xPos;
+
+        // Get normalized positions
+        float targetNormalized = (targetXPos - normalizedMinX) / totalRange;
+        float lastNormalized = (lastSpawnX - normalizedMinX) / totalRange;
+
+        // Check if this would be too far from the last position
+        float normalizedDistance = Mathf.Abs(targetNormalized - lastNormalized);
+        if (normalizedDistance > maxSpawnDistanceFromLast)
+        {
+            // Too far - move closer to last position
+            float direction = targetNormalized > lastNormalized ? 1 : -1; // Which direction we're moving
+            float limitedNormalizedPos = lastNormalized + (direction * maxSpawnDistanceFromLast);
+
+            // Convert back to world space
+            xPos = normalizedMinX + (limitedNormalizedPos * totalRange);
+            Debug.Log($"Limited spawn distance from {targetNormalized:F2} to {limitedNormalizedPos:F2} (max jump: {maxSpawnDistanceFromLast:F2})");
+        }
+
+        // Check if this position is marked as unreachable
+        int positionBucket = Mathf.FloorToInt((xPos - normalizedMinX) / totalRange * positionGridSize);
+        if (unreachablePositions.Contains(positionBucket))
+        {
+            // This position has been marked unreachable - move toward center
+            float centerNormalized = 0.5f;
+            float currentNormalized = (xPos - normalizedMinX) / totalRange;
+
+            // Move 50% of the way toward center
+            float newNormalized = Mathf.Lerp(currentNormalized, centerNormalized, 0.5f);
+            xPos = normalizedMinX + (newNormalized * totalRange);
+
+            Debug.Log($"Avoiding unreachable position in bucket {positionBucket}, moving toward center");
+
+            // Recalculate bucket for the new position
+            positionBucket = Mathf.FloorToInt((xPos - normalizedMinX) / totalRange * positionGridSize);
         }
 
         // Add a little randomness based on spawnRandomness parameter
@@ -208,6 +281,9 @@ public class AdaptiveSpawner : NetworkBehaviour
 
         // Ensure within bounds
         xPos = Mathf.Clamp(xPos, normalizedMinX + wallBuffer, normalizedMaxX - wallBuffer);
+
+        // Save this as the last spawn position
+        lastSpawnX = xPos;
 
         // Track this collectible
         var collectibleInfo = new CollectibleInfo
@@ -247,10 +323,11 @@ public class AdaptiveSpawner : NetworkBehaviour
         {
             // Mark it as collected
             activeCollectibles[foundIndex].isCollected = true;
-            Debug.Log($"Marked collectible collected at position {collectiblePosition.x}");
+            float collectibleX = activeCollectibles[foundIndex].xPosition;
+            Debug.Log($"Marked collectible collected at position {collectibleX}");
 
             // Reset consecutive misses counter for that side
-            float normalizedX = (collectiblePosition.x - normalizedMinX) / (normalizedMaxX - normalizedMinX);
+            float normalizedX = (collectibleX - normalizedMinX) / (normalizedMaxX - normalizedMinX);
             if (normalizedX < 0.5f) // Left side
             {
                 consecutiveLeftMisses = 0;
@@ -261,6 +338,10 @@ public class AdaptiveSpawner : NetworkBehaviour
                 consecutiveRightMisses = 0;
                 Debug.Log("Reset right side consecutive misses");
             }
+
+            // Reset the miss counter for this position bucket
+            int positionBucket = Mathf.FloorToInt(normalizedX * positionGridSize);
+            positionMissCounter[positionBucket] = 0;
         }
         else
         {
@@ -296,8 +377,30 @@ public class AdaptiveSpawner : NetworkBehaviour
             // If it wasn't collected and not already marked as out of bounds, record it as missed
             if (!wasCollected && !collectible.isOutOfBounds)
             {
-                RecordMissedCollectible(collectible.xPosition);
-                Debug.Log($"Recorded miss for collectible at position {collectiblePosition.x}");
+                float missedX = collectible.xPosition;
+                RecordMissedCollectible(missedX);
+
+                // Also track misses by position for unreachable detection
+                float normalizedX = (missedX - normalizedMinX) / (normalizedMaxX - normalizedMinX);
+                int positionBucket = Mathf.FloorToInt(normalizedX * positionGridSize);
+
+                // Initialize counter if needed
+                if (!positionMissCounter.ContainsKey(positionBucket))
+                {
+                    positionMissCounter[positionBucket] = 0;
+                }
+
+                // Increment and check for unreachable threshold
+                positionMissCounter[positionBucket]++;
+
+                if (positionMissCounter[positionBucket] >= unreachableMissLimit &&
+                    !unreachablePositions.Contains(positionBucket))
+                {
+                    unreachablePositions.Add(positionBucket);
+                    Debug.Log($"Position bucket {positionBucket} (x={normalizedX:F2}) marked as unreachable after {unreachableMissLimit} consecutive misses");
+                }
+
+                Debug.Log($"Recorded miss for collectible at position {collectiblePosition.x} (bucket {positionBucket})");
             }
 
             // Remove from tracking
@@ -354,6 +457,13 @@ public class AdaptiveSpawner : NetworkBehaviour
         consecutiveLeftMisses = 0;
         consecutiveRightMisses = 0;
         progressiveDifficultyFactor = 0f;
+
+        // Reset unreachable positions
+        positionMissCounter.Clear();
+        unreachablePositions.Clear();
+
+        // Reset last spawn position to center
+        lastSpawnX = normalizedMinX + (normalizedMaxX - normalizedMinX) * 0.5f;
     }
 
     // Debugging helpers
@@ -365,5 +475,10 @@ public class AdaptiveSpawner : NetworkBehaviour
     public int GetConsecutiveRightMisses()
     {
         return consecutiveRightMisses;
+    }
+
+    public List<int> GetUnreachablePositions()
+    {
+        return unreachablePositions;
     }
 }
