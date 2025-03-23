@@ -24,7 +24,7 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private float playerMovementSpeed = 1.0f; // Base player movement speed
 
     [Header("Adaptive Spawning")]
-    [SerializeField] private AdaptiveSpawner adaptiveSpawner;
+    [SerializeField] public AdaptiveSpawner adaptiveSpawner; // Change to public
     [SerializeField] private bool useAdaptiveSpawning = true;
 
     // Public getters so other scripts can access but not modify these values
@@ -275,6 +275,12 @@ public class NewGameManager : NetworkBehaviour
         gameEnding = true;
 
         Debug.Log("EndGame called - stopping all coroutines");
+
+        // Reset adaptive spawner tracking
+        if (isServer && adaptiveSpawner != null)
+        {
+            adaptiveSpawner.ResetTracking();
+        }
 
         StopAllCoroutines();
 
@@ -605,11 +611,8 @@ public class NewGameManager : NetworkBehaviour
         score += points;
         ChangeScore(Mathf.RoundToInt(score));
 
-        // Mark this collectible as collected in the adaptive spawner
-        if (useAdaptiveSpawning && adaptiveSpawner != null)
-        {
-            adaptiveSpawner.MarkLastCollectibleCollected();
-        }
+        // Note: We no longer call adaptiveSpawner.MarkLastCollectibleCollected() here
+        // because the Collectible itself will notify the spawner directly
 
         // Play sound effect if available
         if (AudioManager.Instance != null)
@@ -665,6 +668,13 @@ public class NewGameManager : NetworkBehaviour
 
         Debug.Log("RestartGame called");
 
+        // Reset adaptive spawner tracking
+        if (adaptiveSpawner != null)
+        {
+            adaptiveSpawner.ResetTracking();
+        }
+
+        // The rest of your existing RestartGame method...
         // Clean up active objects
         foreach (var obj in activeObjects.ToArray())
         {
@@ -682,9 +692,6 @@ public class NewGameManager : NetworkBehaviour
         gameTimer = 0f;
         ChangeScore(0);
 
-        // Set the restart cooldown timer
-        restartCooldownTimer = RESTART_COOLDOWN;
-
         // Reset hand control
         if (GestureDetector.Instance != null)
         {
@@ -695,12 +702,10 @@ public class NewGameManager : NetworkBehaviour
         // Hide end game UI
         DisplayEndGameInfo(false);
 
-        // Show calibration prompt
-        // DisplayCalibrationPrompt(true);
-
         // Don't start the game yet - wait for calibration gesture
         StopAllCoroutines();
     }
+
 
     [ClientRpc]
     private void ChangeScore(int newScore)

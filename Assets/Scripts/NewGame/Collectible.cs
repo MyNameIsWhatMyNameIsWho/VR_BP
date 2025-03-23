@@ -56,6 +56,13 @@ public class Collectible : NetworkBehaviour
                 Destroy(effect, 2f);
             }
 
+            // Notify the adaptive spawner this was collected
+            if (NewGameManager.Instance != null &&
+                NewGameManager.Instance.adaptiveSpawner != null)
+            {
+                NewGameManager.Instance.adaptiveSpawner.MarkCollectibleCollected(transform.position);
+            }
+
             // Add points to score via NewGameManager
             if (NewGameManager.Instance != null)
             {
@@ -76,6 +83,17 @@ public class Collectible : NetworkBehaviour
         if (isServer)
         {
             NetworkServer.Destroy(gameObject);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (isServer && NewGameManager.Instance != null &&
+            NewGameManager.Instance.adaptiveSpawner != null)
+        {
+            // Notify the adaptive spawner this was destroyed (with collection status)
+            NewGameManager.Instance.adaptiveSpawner.NotifyCollectibleDestroyed(
+                transform.position, isCollected);
         }
     }
 }

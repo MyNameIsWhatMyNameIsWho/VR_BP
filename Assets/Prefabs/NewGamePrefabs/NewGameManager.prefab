@@ -428,7 +428,7 @@ MonoBehaviour:
   playerMovementSpeed: 5
   adaptiveSpawner: {fileID: 5771136485274600133}
   useAdaptiveSpawning: 1
-  obstacleSpawnInterval: 3
+  obstacleSpawnInterval: 1.5
   collectibleSpawnInterval: 1.5
   objectSpawnY: 10
   initialButtons: {fileID: 2566665300545572651}
@@ -670,13 +670,11 @@ MonoBehaviour:
   syncInterval: 0
   gameManager: {fileID: 4098997886964978644}
   character: {fileID: 7631030326713354399}
-  historyLength: 20
-  adaptiveRate: 0.1
-  obstaclePlayerOffset: 0.5
-  initialRandomness: 1
-  minRandomness: 0.3
-  leftSkewThreshold: 0.4
-  rightSkewThreshold: 0.6
+  missedItemsBeforeStrongBias: 1
+  spawnRandomness: 0.08
+  problemAreaProbability: 0.85
+  problemAreaExtraProbabilityPerMiss: 0.05
+  maxConsecutiveMissesTracked: 5
 --- !u!1 &6942237682954814911
 GameObject:
   m_ObjectHideFlags: 0
