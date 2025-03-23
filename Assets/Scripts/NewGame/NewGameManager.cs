@@ -27,6 +27,13 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] public AdaptiveSpawner adaptiveSpawner; // Change to public
     [SerializeField] private bool useAdaptiveSpawning = true;
 
+    [Header("Combined Mode Settings")]
+    [SerializeField] private bool enableCollectiblesInObstacleMode = true;
+    [SerializeField] private float collectibleSpawnChance = 0.3f; // 30% chance to spawn a collectible
+    [SerializeField] private float obstacleCollectibleMinDistance = 1.5f; // Minimum distance between obstacles and collectibles
+    [SerializeField] private int collectibleBonusPoints = 5; // Points added for each collectible in obstacle mode
+    [SerializeField] private float collectibleSpawnHeightOffset = 1.0f; // Spawn collectibles a bit lower than obstacles
+
     // Public getters so other scripts can access but not modify these values
     public float ObstacleFallSpeed => obstacleFallSpeed;
     public float CollectibleFallSpeed => collectibleFallSpeed;
@@ -116,6 +123,12 @@ public class NewGameManager : NetworkBehaviour
     private void Start()
     {
         menuManager = FindFirstObjectByType<GameMenuManager>();
+
+        // Hide time text at start
+        if (timeText != null)
+        {
+            timeText.gameObject.SetActive(false);
+        }
 
         // Set up UI toggles for game start/end
         OnGameEnd.AddListener(() =>
@@ -401,20 +414,6 @@ public class NewGameManager : NetworkBehaviour
         }
     }
 
-    // [ClientRpc]
-    // private void DisplayCalibrationPrompt(bool display)
-    // {
-    //     if (calibrationPrompt != null)
-    //     {
-    //         calibrationPrompt.SetActive(display);
-    //         Debug.Log($"Calibration prompt {(display ? "shown" : "hidden")}");
-    //     }
-    //     else
-    //     {
-    //         Debug.LogWarning("Calibration prompt UI element is not assigned!");
-    //     }
-    // }
-
     [ClientRpc]
     public void StartGame()
     {
@@ -507,10 +506,48 @@ public class NewGameManager : NetworkBehaviour
         Debug.Log("SpawnObstacles coroutine started");
         yield return new WaitForSeconds(1.0f); // Initial delay
 
+        // Keep track of recent obstacle positions to avoid spawning collectibles too close
+        List<Vector3> recentObstaclePositions = new List<Vector3>();
+        float timeSinceLastCollectible = 0f;
+        float forceCollectibleAfterTime = 5f; // Force spawn a collectible if none spawned for 5 seconds
+
         // Keep spawning as long as game is running
         while (gameRunning)
         {
-            SpawnObject(obstaclePrefab, "Obstacle");
+            // Spawn an obstacle
+            Vector3 obstaclePosition = SpawnObject(obstaclePrefab, "Obstacle");
+
+            // Track this obstacle's position (for collectible placement logic)
+            recentObstaclePositions.Add(obstaclePosition);
+
+            // Only keep track of the 5 most recent obstacles
+            while (recentObstaclePositions.Count > 5)
+            {
+                recentObstaclePositions.RemoveAt(0);
+            }
+
+            // Chance to spawn a collectible in obstacle mode
+            bool shouldSpawnCollectible = enableCollectiblesInObstacleMode &&
+                                         (Random.value < collectibleSpawnChance || timeSinceLastCollectible >= forceCollectibleAfterTime);
+
+            if (shouldSpawnCollectible)
+            {
+                // Wait a moment before spawning the collectible so it's not directly aligned with the obstacle
+                yield return new WaitForSeconds(obstacleSpawnInterval * 0.3f);
+
+                // Only spawn if the game is still running
+                if (gameRunning)
+                {
+                    // Spawn a collectible in a safe position
+                    SpawnCollectibleSafeFromObstacles(recentObstaclePositions);
+                    timeSinceLastCollectible = 0f; // Reset timer
+                }
+            }
+            else
+            {
+                timeSinceLastCollectible += obstacleSpawnInterval;
+            }
+
             yield return new WaitForSeconds(obstacleSpawnInterval);
 
             // Double check game is still running
@@ -547,13 +584,13 @@ public class NewGameManager : NetworkBehaviour
     }
 
     [Server]
-    private void SpawnObject(GameObject prefab, string objectType)
+    private Vector3 SpawnObject(GameObject prefab, string objectType)
     {
         // Additional check to ensure we don't spawn after game over
         if (!gameRunning)
         {
             Debug.Log("Attempted to spawn object after game ended - ignoring");
-            return;
+            return Vector3.zero;
         }
 
         Vector3 spawnPosition;
@@ -609,8 +646,98 @@ public class NewGameManager : NetworkBehaviour
         // Spawn on network and track
         NetworkServer.Spawn(obj);
         activeObjects.Add(obj);
+
+        // Return the spawn position for tracking
+        return spawnPosition;
     }
 
+    // New method to spawn collectibles away from obstacles
+    private void SpawnCollectibleSafeFromObstacles(List<Vector3> obstaclePositions)
+    {
+        // Maximum attempts to find a safe position
+        int maxAttempts = 5;
+
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            Vector3 collectiblePosition;
+
+            // Get a potential spawn position
+            if (useAdaptiveSpawning && adaptiveSpawner != null)
+            {
+                // Use adaptive spawner to encourage movement to challenge areas
+                collectiblePosition = adaptiveSpawner.GetCollectibleSpawnPosition(objectSpawnY - collectibleSpawnHeightOffset);
+            }
+            else
+            {
+                // Use random position
+                float safeMinX = minX + wallBuffer;
+                float safeMaxX = maxX - wallBuffer;
+
+                collectiblePosition = new Vector3(
+                    Random.Range(safeMinX, safeMaxX),
+                    objectSpawnY - collectibleSpawnHeightOffset,
+                    12f
+                );
+            }
+
+            // If obstacles list is empty, no need to check for safety
+            if (obstaclePositions.Count == 0)
+            {
+                SpawnCollectibleAtPosition(collectiblePosition);
+                return;
+            }
+
+            // Check if position is safe from obstacles
+            bool isSafe = true;
+            foreach (Vector3 obstaclePos in obstaclePositions)
+            {
+                // Only check X distance since they're at different heights
+                float xDistance = Mathf.Abs(obstaclePos.x - collectiblePosition.x);
+
+                if (xDistance < obstacleCollectibleMinDistance)
+                {
+                    isSafe = false;
+                    break;
+                }
+            }
+
+            // If position is safe, spawn collectible
+            if (isSafe)
+            {
+                SpawnCollectibleAtPosition(collectiblePosition);
+                return;
+            }
+        }
+
+        // If we couldn't find a safe position after max attempts, spawn anyway in a random position
+        // to ensure collectibles don't stop appearing
+        float fallbackMinX = minX + wallBuffer;
+        float fallbackMaxX = maxX - wallBuffer;
+
+        Vector3 fallbackPosition = new Vector3(
+            Random.Range(fallbackMinX, fallbackMaxX),
+            objectSpawnY - collectibleSpawnHeightOffset,
+            12f
+        );
+
+        SpawnCollectibleAtPosition(fallbackPosition);
+        Debug.Log("Using fallback position for collectible after failed safe placement attempts");
+    }
+
+    // Helper method to avoid code duplication
+    private void SpawnCollectibleAtPosition(Vector3 position)
+    {
+        GameObject obj = Instantiate(collectiblePrefab, position, Quaternion.identity);
+
+        Collectible collectible = obj.GetComponent<Collectible>();
+        if (collectible != null)
+        {
+            collectible.Initialize();
+        }
+
+        NetworkServer.Spawn(obj);
+        activeObjects.Add(obj);
+    }
 
     /// <summary>
     /// Called when a collectible is collected by the player
@@ -620,11 +747,19 @@ public class NewGameManager : NetworkBehaviour
         if (!isServer || !gameRunning) return;
 
         // Add points to score
-        score += points;
-        ChangeScore(Mathf.RoundToInt(score));
+        if (isCollectionMode)
+        {
+            // In collection mode, points are added directly from the collectible value
+            score += points;
+        }
+        else
+        {
+            // In obstacle mode, add a fixed bonus to the continuously increasing score
+            score += collectibleBonusPoints;
+        }
 
-        // Note: We no longer call adaptiveSpawner.MarkLastCollectibleCollected() here
-        // because the Collectible itself will notify the spawner directly
+        // Update the score display
+        ChangeScore(Mathf.RoundToInt(score));
 
         // Play sound effect if available
         if (AudioManager.Instance != null)
