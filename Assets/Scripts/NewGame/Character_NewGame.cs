@@ -9,7 +9,8 @@ public class Character_NewGame : NetworkBehaviour
     [SerializeField] private float maxX = 5f;   // Right boundary for the cube
     [SerializeField] private float handMovementScale = 50.0f; // Much higher multiplier for less hand movement required
     [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from wall to prevent jittering
-     private float movementSpeed = 10.0f; // Units per second the cube will move
+    [SerializeField] private float movementSpeed = 10.0f; // Units per second the cube will move
+    [SerializeField] private float smoothingFactor = 0.05f; // How much smoothing to apply (0-1, lower is smoother)
 
     [Header("Gesture Control")]
     public bool controllingHandIsLeft = false;
@@ -22,6 +23,9 @@ public class Character_NewGame : NetworkBehaviour
     private Vector3 initialHandPosition;
     private bool isInitialized = false;
     private Vector3 lastValidPosition;
+
+    // For smoothing
+    private static Vector3 filteredOffset = Vector3.zero;
 
     // Debugging
     private int frameCount = 0;
@@ -55,8 +59,8 @@ public class Character_NewGame : NetworkBehaviour
         // Calculate offset from initial position
         float handOffset = currentHandPosition.x - initialHandPosition.x;
 
-        // Apply movement scale and speed multiplier
-        float scaledOffset = handOffset * handMovementScale * movementSpeed;
+        // Apply hand movement scale
+        float rawTargetOffset = handOffset * handMovementScale;
 
         // Calculate target position with center-relative positioning
         float centerX = (minX + maxX) / 2f;
@@ -68,8 +72,12 @@ public class Character_NewGame : NetworkBehaviour
             transform.position.z
         );
 
-        // Calculate target position within allowed boundaries
-        float targetX = Mathf.Clamp(centerX + scaledOffset, minX + wallBuffer, maxX - wallBuffer);
+        // Apply heavy smoothing to the raw input to reduce tremors/jitter
+        // We use a running average approach
+        filteredOffset = Vector3.Lerp(filteredOffset, new Vector3(rawTargetOffset, 0, 0), smoothingFactor);
+
+        // Calculate target position within allowed boundaries using the smoothed offset
+        float targetX = Mathf.Clamp(centerX + filteredOffset.x, minX + wallBuffer, maxX - wallBuffer);
 
         // Check if we're at a wall boundary and trying to go further
         bool atLeftWall = transform.position.x <= minX + wallBuffer + 0.01f;
@@ -125,7 +133,7 @@ public class Character_NewGame : NetworkBehaviour
         if (shouldLog)
         {
             float percentToEdge = Mathf.Abs((transform.position.x - centerX) / ((maxX - minX) / 2f)) * 100f;
-            Debug.Log($"Hand offset: {handOffset:F4}, Scaled: {scaledOffset:F2}, " +
+            Debug.Log($"Hand offset: {handOffset:F4}, Filtered: {filteredOffset.x:F2}, " +
                      $"Pos X: {transform.position.x:F2}, At wall: {atLeftWall || atRightWall}, " +
                      $"Percent to edge: {percentToEdge:F1}%");
         }
@@ -162,6 +170,8 @@ public class Character_NewGame : NetworkBehaviour
         canMove = true;
         isInitialized = false;
         frameCount = 0;
+        // Reset the filtered offset when starting
+        filteredOffset = Vector3.zero;
     }
 
     // Method to change the movement speed
@@ -188,6 +198,7 @@ public class Character_NewGame : NetworkBehaviour
         Debug.Log("Spawning cube");
         canMove = false;
         isInitialized = false;
+        filteredOffset = Vector3.zero;
 
         // Reset position to center
         transform.position = new Vector3(

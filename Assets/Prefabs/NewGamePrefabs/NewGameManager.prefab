@@ -382,6 +382,7 @@ Transform:
   - {fileID: 2668899604091197419}
   - {fileID: 7879236846180023055}
   - {fileID: 8959768148359979864}
+  - {fileID: 6137429471114759353}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &-4041341254498549845
@@ -419,19 +420,23 @@ MonoBehaviour:
   obstaclePrefab: {fileID: 1750598833352266042, guid: 545dfeb8674377a42bce2f683dd45034, type: 3}
   collectiblePrefab: {fileID: 6876682746856611867, guid: c75dea92ea8768f4c9c71148a7290b4a, type: 3}
   activeObjects: []
+  minX: -5
+  maxX: 5
+  wallBuffer: 0.5
   obstacleFallSpeed: 5
   collectibleFallSpeed: 4
   playerMovementSpeed: 5
+  adaptiveSpawner: {fileID: 5771136485274600133}
+  useAdaptiveSpawning: 1
   obstacleSpawnInterval: 3
   collectibleSpawnInterval: 1.5
-  objectSpawnRangeX: 5
   objectSpawnY: 10
   initialButtons: {fileID: 2566665300545572651}
   inGameBackButton: {fileID: 8459340216251620434}
   endgameInfo: {fileID: 5881575536552786249}
   movementSpeed: 2
   isCollectionMode: 0
-  gameTimeLimit: 10
+  gameTimeLimit: 60
   waitAfterDeath: 1
   character: {fileID: 7631030326713354399}
   scoreText: {fileID: 2783230211383033144}
@@ -616,6 +621,62 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 6542607857078651148}
   m_maskType: 0
+--- !u!1 &6087421402189772106
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6137429471114759353}
+  - component: {fileID: 5771136485274600133}
+  m_Layer: 0
+  m_Name: AdaptiveSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6137429471114759353
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6087421402189772106}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.079, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7220462270889839084}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5771136485274600133
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6087421402189772106}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e86a4962fa60d214183450dd0fd54e44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  gameManager: {fileID: 4098997886964978644}
+  character: {fileID: 7631030326713354399}
+  historyLength: 20
+  adaptiveRate: 0.1
+  obstaclePlayerOffset: 0.5
+  initialRandomness: 1
+  minRandomness: 0.3
+  leftSkewThreshold: 0.4
+  rightSkewThreshold: 0.6
 --- !u!1 &6942237682954814911
 GameObject:
   m_ObjectHideFlags: 0
@@ -1150,6 +1211,8 @@ MonoBehaviour:
   maxX: 5
   handMovementScale: 40
   wallBuffer: 0.5
+  movementSpeed: 10
+  smoothingFactor: 0.05
   controllingHandIsLeft: 0
   OnHandPositionUpdated:
     m_PersistentCalls:

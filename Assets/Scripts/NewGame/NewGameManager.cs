@@ -15,25 +15,36 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private GameObject collectiblePrefab;
     [SerializeField] private List<GameObject> activeObjects = new List<GameObject>(); // Keep track of all spawned objects
 
-    [Header("Speed Settings")]
+    [Header("Movement Settings")]
+    [SerializeField] private float minX = -5f;  // Left boundary for the cube
+    [SerializeField] private float maxX = 5f;   // Right boundary for the cube
+    [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from wall to prevent objects spawning in walls
     [SerializeField] private float obstacleFallSpeed = 0.8f;
     [SerializeField] private float collectibleFallSpeed = 1.2f;
     [SerializeField] private float playerMovementSpeed = 1.0f; // Base player movement speed
 
+    [Header("Adaptive Spawning")]
+    [SerializeField] private AdaptiveSpawner adaptiveSpawner;
+    [SerializeField] private bool useAdaptiveSpawning = true;
+
     // Public getters so other scripts can access but not modify these values
     public float ObstacleFallSpeed => obstacleFallSpeed;
     public float CollectibleFallSpeed => collectibleFallSpeed;
+    public float GetMinX() { return minX; }
+    public float GetMaxX() { return maxX; }
+    public float GetWallBuffer() { return wallBuffer; }
+    public bool IsGameRunning() { return gameRunning; }
 
     [Header("Spawn Settings")]
     [SerializeField] private float obstacleSpawnInterval = 4f;
     [SerializeField] private float collectibleSpawnInterval = 2f;
-    [SerializeField] private float objectSpawnRangeX = 5f;
     [SerializeField] private float objectSpawnY = 10f;
 
     [Header("UI Elements")]
     [SerializeField] private GameObject initialButtons;
     [SerializeField] private GameObject inGameBackButton;
     [SerializeField] private GameObject endgameInfo;
+    // [SerializeField] private GameObject calibrationPrompt; // UI element to show calibration instructions
 
     [Header("Game Settings")]
     [SerializeField] private float movementSpeed = 2.00f;
@@ -49,10 +60,17 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private TextMeshPro endgameHighScoreText;
 
     private GameMenuManager menuManager;
+
+    // Game state variables
     private bool gameRunning = false;
+    private bool awaitingCalibration = true; // Flag to indicate we're waiting for initial gesture
     private float gameTimer = 0f;
     private Coroutine spawnCoroutine;
     private bool gameEnding = false; // Flag to prevent multiple EndGame calls
+
+    // Restart delay for calibration to prevent immediate restart
+    private float restartCooldownTimer = 0f;
+    private const float RESTART_COOLDOWN = 1.5f;
 
     public float score = 0f;
     public UnityEvent OnGameStart;
@@ -106,6 +124,7 @@ public class NewGameManager : NetworkBehaviour
             Debug.Log("OnGameStart invoked - hiding UI buttons");
             initialButtons.SetActive(false);
             inGameBackButton.SetActive(true);
+            // DisplayCalibrationPrompt(false);
         });
 
         // Ensure endgame UI is hidden at start
@@ -118,6 +137,9 @@ public class NewGameManager : NetworkBehaviour
             Debug.LogError("endgameInfo reference is missing!");
         }
 
+        // Show calibration prompt at start
+        // DisplayCalibrationPrompt(true);
+
         if (!isServer) return;
 
         // Set up gesture detection to start the game
@@ -126,25 +148,40 @@ public class NewGameManager : NetworkBehaviour
             GestureDetector.Instance.OnGestureBegin.RemoveListener(OnGestureDetectedHandler);
             GestureDetector.Instance.OnGestureBegin.AddListener(OnGestureDetectedHandler);
 
-            // Set up controlling hand
-            GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
-            GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
-
-            // If right hand is disabled, switch to left
-            if (GestureDetector.Instance.handR != null && GestureDetector.Instance.handR.IsDisabled)
+            // Make sure the character reference is valid
+            if (character != null)
             {
-                character.controllingHandIsLeft = !character.controllingHandIsLeft;
-                GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
-                GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
+                // Set up controlling hand
+                if (GestureDetector.Instance.handL != null && GestureDetector.Instance.handR != null)
+                {
+                    GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
+                    GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
+
+                    // If right hand is disabled, switch to left
+                    if (GestureDetector.Instance.handR.IsDisabled)
+                    {
+                        character.controllingHandIsLeft = !character.controllingHandIsLeft;
+                        GestureDetector.Instance.handL.SetControllingHand(character.controllingHandIsLeft);
+                        GestureDetector.Instance.handR.SetControllingHand(!character.controllingHandIsLeft);
+                    }
+                }
+                else
+                {
+                    Debug.LogError("GestureDetector hands are null!");
+                }
+
+                // Position character
+                character.Spawn();
+            }
+            else
+            {
+                Debug.LogError("Character reference is null!");
             }
         }
         else
         {
             Debug.LogError("GestureDetector.Instance is null");
         }
-
-        // Position character
-        character.Spawn();
 
         // Log highscore
         Debug.Log($"Current highscore: {Highscore}");
@@ -164,16 +201,27 @@ public class NewGameManager : NetworkBehaviour
         // Check if this is the controlling hand
         bool isControllingHand = (character.controllingHandIsLeft == isLeft);
 
-        // Start game on any gesture if not already running and not showing endgame
-        if (!gameRunning && !endgameInfo.activeSelf && isControllingHand)
+        // Only process if we're not in the restart cooldown period
+        if (restartCooldownTimer <= 0)
         {
-            Debug.Log($"Starting game with gesture: {gesture} from {(isLeft ? "left" : "right")} hand");
-            StartGame();
+            // Start game if awaiting calibration and not showing endgame
+            if (awaitingCalibration && !endgameInfo.activeSelf && isControllingHand)
+            {
+                Debug.Log($"Calibration gesture detected: {gesture} from {(isLeft ? "left" : "right")} hand");
+                StartGame();
+                awaitingCalibration = false; // No longer awaiting calibration
+            }
         }
     }
 
     private void Update()
     {
+        // Update the restart cooldown timer if active
+        if (restartCooldownTimer > 0)
+        {
+            restartCooldownTimer -= Time.deltaTime;
+        }
+
         if (!gameRunning) return;
 
         if (isCollectionMode)
@@ -341,6 +389,20 @@ public class NewGameManager : NetworkBehaviour
         }
     }
 
+    // [ClientRpc]
+    // private void DisplayCalibrationPrompt(bool display)
+    // {
+    //     if (calibrationPrompt != null)
+    //     {
+    //         calibrationPrompt.SetActive(display);
+    //         Debug.Log($"Calibration prompt {(display ? "shown" : "hidden")}");
+    //     }
+    //     else
+    //     {
+    //         Debug.LogWarning("Calibration prompt UI element is not assigned!");
+    //     }
+    // }
+
     [ClientRpc]
     public void StartGame()
     {
@@ -353,6 +415,7 @@ public class NewGameManager : NetworkBehaviour
         // Reset game state
         gameRunning = true;
         gameEnding = false;
+        awaitingCalibration = false; // Calibration complete
         score = 0;
         gameTimer = 0f;
         ChangeScore(0);
@@ -475,12 +538,34 @@ public class NewGameManager : NetworkBehaviour
             return;
         }
 
-        // Calculate random position
-        Vector3 spawnPosition = new Vector3(
-            Random.Range(-objectSpawnRangeX, objectSpawnRangeX),
-            objectSpawnY,
-            12f
-        );
+        Vector3 spawnPosition;
+
+        // Use adaptive spawning if enabled
+        if (useAdaptiveSpawning && adaptiveSpawner != null)
+        {
+            if (objectType == "Obstacle")
+            {
+                // Obstacles spawn above player to force movement
+                spawnPosition = adaptiveSpawner.GetObstacleSpawnPosition(objectSpawnY);
+            }
+            else // Collectible
+            {
+                // Collectibles spawn in areas player struggles with
+                spawnPosition = adaptiveSpawner.GetCollectibleSpawnPosition(objectSpawnY);
+            }
+        }
+        else
+        {
+            // Original spawning logic - safe area only
+            float safeMinX = minX + wallBuffer;
+            float safeMaxX = maxX - wallBuffer;
+
+            spawnPosition = new Vector3(
+                Random.Range(safeMinX, safeMaxX),
+                objectSpawnY,
+                12f
+            );
+        }
 
         // Instantiate the object
         GameObject obj = Instantiate(prefab, spawnPosition, Quaternion.identity);
@@ -508,6 +593,7 @@ public class NewGameManager : NetworkBehaviour
         activeObjects.Add(obj);
     }
 
+
     /// <summary>
     /// Called when a collectible is collected by the player
     /// </summary>
@@ -518,6 +604,12 @@ public class NewGameManager : NetworkBehaviour
         // Add points to score
         score += points;
         ChangeScore(Mathf.RoundToInt(score));
+
+        // Mark this collectible as collected in the adaptive spawner
+        if (useAdaptiveSpawning && adaptiveSpawner != null)
+        {
+            adaptiveSpawner.MarkLastCollectibleCollected();
+        }
 
         // Play sound effect if available
         if (AudioManager.Instance != null)
@@ -585,9 +677,13 @@ public class NewGameManager : NetworkBehaviour
         character.Spawn();
         gameRunning = false;
         gameEnding = false;
+        awaitingCalibration = true; // Set to awaiting calibration
         score = 0f;
         gameTimer = 0f;
         ChangeScore(0);
+
+        // Set the restart cooldown timer
+        restartCooldownTimer = RESTART_COOLDOWN;
 
         // Reset hand control
         if (GestureDetector.Instance != null)
@@ -599,9 +695,11 @@ public class NewGameManager : NetworkBehaviour
         // Hide end game UI
         DisplayEndGameInfo(false);
 
-        // Restart game
+        // Show calibration prompt
+        // DisplayCalibrationPrompt(true);
+
+        // Don't start the game yet - wait for calibration gesture
         StopAllCoroutines();
-        StartGame();
     }
 
     [ClientRpc]

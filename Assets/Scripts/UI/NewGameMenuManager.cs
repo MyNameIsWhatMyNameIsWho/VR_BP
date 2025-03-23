@@ -5,7 +5,7 @@ using UnityEngine;
 public class NewGameMenuManager : GameMenuManager
 {
     private NewGameManager newGameManager;
-    private bool gameSetupInitialized = false;
+    //private bool gameSetupInitialized;
 
     [ClientRpc]
     public override void LoadLevel(int level)
@@ -42,7 +42,7 @@ public class NewGameMenuManager : GameMenuManager
             // Set the game mode
             SetGameMode(isCollectionMode);
 
-            gameSetupInitialized = true;
+           // gameSetupInitialized = true;
             Debug.Log($"NewGame setup completed successfully. Collection Mode: {isCollectionMode}");
         }
         else

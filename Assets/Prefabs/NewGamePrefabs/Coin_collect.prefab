@@ -139,6 +139,5 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  fallSpeed: 0.8
   pointValue: 10
   collectionEffect: {fileID: 0}
