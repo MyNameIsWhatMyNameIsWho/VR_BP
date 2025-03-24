@@ -429,6 +429,11 @@ MonoBehaviour:
   playerMovementSpeed: 5
   adaptiveSpawner: {fileID: 5771136485274600133}
   useAdaptiveSpawning: 1
+  enableCollectiblesInObstacleMode: 1
+  collectibleSpawnChance: 0.3
+  obstacleCollectibleMinDistance: 1.5
+  collectibleBonusPoints: 5
+  collectibleSpawnHeightOffset: 1
   obstacleSpawnInterval: 1.5
   collectibleSpawnInterval: 1.5
   objectSpawnY: 10
@@ -676,6 +681,8 @@ MonoBehaviour:
   problemAreaProbability: 0.85
   problemAreaExtraProbabilityPerMiss: 0.05
   maxConsecutiveMissesTracked: 5
+  unreachableMissLimit: 3
+  maxSpawnDistanceFromLast: 0.5
 --- !u!1 &6435965707341285926
 GameObject:
   m_ObjectHideFlags: 0
@@ -1238,10 +1245,10 @@ GameObject:
   m_Component:
   - component: {fileID: 7879236846180023055}
   - component: {fileID: 3820552083188763519}
+  - component: {fileID: 7631030326713354399}
   - component: {fileID: 921437072749443703}
   - component: {fileID: 2566739834563150072}
   - component: {fileID: 7989564692850785100}
-  - component: {fileID: 7631030326713354399}
   m_Layer: 9
   m_Name: Character_cube
   m_TagString: Player
@@ -1272,6 +1279,31 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8968236218946665197}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &7631030326713354399
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8968236218946665197}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0836c7d6dba35384fb78e9a4bd23d50d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  minX: -5
+  maxX: 5
+  handMovementScale: 50
+  wallBuffer: 0.5
+  movementSpeed: 10
+  smoothingFactor: 0.05
+  controllingHandIsLeft: 0
+  OnHandPositionUpdated:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!23 &921437072749443703
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1362,31 +1394,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &7631030326713354399
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8968236218946665197}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0836c7d6dba35384fb78e9a4bd23d50d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  syncDirection: 0
-  syncMode: 0
-  syncInterval: 0
-  minX: -5
-  maxX: 5
-  handMovementScale: 50
-  wallBuffer: 0.5
-  movementSpeed: 10
-  smoothingFactor: 0.05
-  controllingHandIsLeft: 0
-  OnHandPositionUpdated:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!1001 &4564845428829403798
 PrefabInstance:
   m_ObjectHideFlags: 0
