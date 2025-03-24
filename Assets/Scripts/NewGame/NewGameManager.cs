@@ -217,6 +217,9 @@ public class NewGameManager : NetworkBehaviour
 
     private void OnGestureDetectedHandler(GestureType gesture, bool isLeft)
     {
+        // Only respond to Paper gesture for calibration (ignore Rock gesture)
+        if (gesture != GestureType.Paper) return;
+
         // Check if this is the controlling hand
         bool isControllingHand = (character.controllingHandIsLeft == isLeft);
 
