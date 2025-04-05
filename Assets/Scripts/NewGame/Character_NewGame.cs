@@ -5,19 +5,20 @@ using UnityEngine.Events;
 public class Character_NewGame : NetworkBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] private float minX = -5f;  // Left boundary for the cube
-    [SerializeField] private float maxX = 5f;   // Right boundary for the cube
-    [SerializeField] private float handMovementScale = 50.0f; // Much higher multiplier for less hand movement required
-    [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from wall to prevent jittering
-    [SerializeField] private float movementSpeed = 10.0f; // Units per second the cube will move
-    [SerializeField] private float smoothingFactor = 0.05f; // How much smoothing to apply (0-1, lower is smoother)
+    [SerializeField] private float minX = -5f;  // Left boundary
+    [SerializeField] private float maxX = 5f;   // Right boundary
+    [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from walls
+    [SerializeField] private float maxSpeed = 10.0f; // Maximum movement speed
+    [SerializeField] private float acceleration = 30.0f; // How quickly speed increases
+    [SerializeField] private float deceleration = 60.0f; // How quickly speed decreases (higher = more responsive stops)
+    [SerializeField] private float directionChangeMultiplier = 2.0f; // Multiplier for direction changes (higher = more responsive)
+    [SerializeField] private float handSensitivity = 50.0f; // Sensitivity of hand movement
 
     [Header("Balloon Rotation Animation")]
-    [SerializeField] private float maxTiltAngle = 15f; // Maximum tilt angle (in degrees)
-    [SerializeField] private float tiltSpeed = 3f; // How quickly the balloon tilts (higher = faster)
-    private Quaternion targetRotation; // The rotation we're smoothly moving toward
-    private Vector3 previousPosition; // Used to calculate movement direction
-    private float currentVelocity; // Used to calculate movement direction and speed
+    [SerializeField] private float maxTiltAngle = 15f; // Maximum tilt angle
+    [SerializeField] private float tiltSpeed = 3f; // How quickly the balloon tilts
+    private Quaternion targetRotation;
+    private float currentTiltAngle = 0f;
 
     [Header("Gesture Control")]
     public bool controllingHandIsLeft = false;
@@ -29,19 +30,21 @@ public class Character_NewGame : NetworkBehaviour
     private bool canMove = false;
     private Vector3 initialHandPosition;
     private bool isInitialized = false;
-    private Vector3 lastValidPosition;
+    private float currentSpeed = 0f;
+    private float targetSpeed = 0f;
+    private float lastHandX = 0f;
+    private float handOffset = 0f;
 
-    // For smoothing
-    private static Vector3 filteredOffset = Vector3.zero;
+    // Movement smoothing
+    private float velocityXSmoothing;
 
     // Debugging
     private int frameCount = 0;
 
     private void Awake()
     {
-        lastValidPosition = new Vector3((minX + maxX) / 2f, transform.position.y, transform.position.z);
-        previousPosition = lastValidPosition;
         targetRotation = Quaternion.identity;
+        transform.position = new Vector3((minX + maxX) / 2f, transform.position.y, transform.position.z);
     }
 
     private void Update()
@@ -60,105 +63,65 @@ public class Character_NewGame : NetworkBehaviour
         if (!isInitialized)
         {
             initialHandPosition = currentHandPosition;
+            lastHandX = currentHandPosition.x;
             isInitialized = true;
             Debug.Log($"Initial hand position set: {initialHandPosition}");
             return;
         }
 
-        // Calculate offset from initial position
-        float handOffset = currentHandPosition.x - initialHandPosition.x;
+        // Calculate hand movement
+        handOffset = (currentHandPosition.x - initialHandPosition.x) * handSensitivity;
+        float handDelta = currentHandPosition.x - lastHandX;
+        lastHandX = currentHandPosition.x;
 
-        // Apply hand movement scale
-        float rawTargetOffset = handOffset * handMovementScale;
+        // Calculate target speed based on hand position
+        // Clamp to ensure we don't exceed max speed
+        targetSpeed = Mathf.Clamp(handOffset, -maxSpeed, maxSpeed);
 
-        // Calculate target position with center-relative positioning
-        float centerX = (minX + maxX) / 2f;
+        // Determine if we're changing direction
+        bool changingDirection = (currentSpeed > 0 && targetSpeed < 0) || (currentSpeed < 0 && targetSpeed > 0);
 
-        // Hard clamp the cube position to prevent going through walls
-        transform.position = new Vector3(
-            Mathf.Clamp(transform.position.x, minX + wallBuffer, maxX - wallBuffer),
-            transform.position.y,
-            transform.position.z
-        );
+        // Apply acceleration or deceleration based on movement state
+        float accelRate = acceleration;
 
-        // Apply heavy smoothing to the raw input to reduce tremors/jitter
-        // We use a running average approach
-        filteredOffset = Vector3.Lerp(filteredOffset, new Vector3(rawTargetOffset, 0, 0), smoothingFactor);
-
-        // Calculate target position within allowed boundaries using the smoothed offset
-        float targetX = Mathf.Clamp(centerX + filteredOffset.x, minX + wallBuffer, maxX - wallBuffer);
-
-        // Check if we're at a wall boundary and trying to go further
-        bool atLeftWall = transform.position.x <= minX + wallBuffer + 0.01f;
-        bool atRightWall = transform.position.x >= maxX - wallBuffer - 0.01f;
-        bool tryingToGoLeft = targetX < transform.position.x;
-        bool tryingToGoRight = targetX > transform.position.x;
-
-        // Calculate velocity for balloon tilt animation
-        Vector3 oldPosition = transform.position;
-
-        // Only move if we're not at a wall or we're moving away from the wall
-        if ((!atLeftWall || !tryingToGoLeft) && (!atRightWall || !tryingToGoRight))
+        // If changing direction, apply the direction change multiplier for more responsive turns
+        if (changingDirection)
         {
-            // Calculate desired position with full responsiveness to hand movement
-            Vector3 desiredPosition = new Vector3(
-                targetX,
-                transform.position.y,
-                transform.position.z
-            );
-
-            // Calculate the maximum distance we can move this frame based on movementSpeed
-            float maxMoveDistance = movementSpeed * Time.deltaTime;
-
-            // Get the direction to the target
-            Vector3 moveDirection = desiredPosition - transform.position;
-            float distanceToTarget = moveDirection.magnitude;
-
-            // If we're not at the target, move toward it at a controlled speed
-            if (distanceToTarget > 0.001f)
-            {
-                // Normalize direction and multiply by max distance
-                moveDirection.Normalize();
-
-                // Create new position by moving a limited distance toward target
-                Vector3 newPosition = transform.position;
-
-                // Either move the max distance or the full distance if it's smaller
-                if (distanceToTarget <= maxMoveDistance)
-                {
-                    newPosition = desiredPosition;
-                }
-                else
-                {
-                    newPosition += moveDirection * maxMoveDistance;
-                }
-
-                // Final safety clamp to ensure we never go outside bounds
-                newPosition.x = Mathf.Clamp(newPosition.x, minX + wallBuffer, maxX - wallBuffer);
-
-                transform.position = newPosition;
-                lastValidPosition = newPosition;
-            }
+            accelRate *= directionChangeMultiplier;
+        }
+        // If slowing down or stopping, use deceleration rate instead
+        else if (Mathf.Abs(targetSpeed) < Mathf.Abs(currentSpeed) || Mathf.Approximately(targetSpeed, 0))
+        {
+            accelRate = deceleration;
         }
 
-        // Calculate velocity for balloon tilt (how fast we're moving left/right)
-        currentVelocity = (transform.position.x - previousPosition.x) / Time.deltaTime;
-        previousPosition = transform.position;
+        // Smoothly adjust current speed toward target speed
+        currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, accelRate * Time.deltaTime);
 
-        // Calculate the target rotation angle based on velocity
-        float tiltAngle = Mathf.Clamp(-currentVelocity * 5f, -maxTiltAngle, maxTiltAngle);
-        targetRotation = Quaternion.Euler(0, 0, tiltAngle);
+        // Apply movement
+        Vector3 newPosition = transform.position;
+        newPosition.x += currentSpeed * Time.deltaTime;
 
-        // Smoothly rotate toward the target rotation
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, tiltSpeed * Time.deltaTime);
+        // Clamp to boundaries
+        newPosition.x = Mathf.Clamp(newPosition.x, minX + wallBuffer, maxX - wallBuffer);
+        transform.position = newPosition;
+
+        // Calculate tilt based on current speed and max speed
+        float speedPercent = currentSpeed / maxSpeed;
+        float targetTiltAngle = -maxTiltAngle * speedPercent; // Negative because moving right (positive speed) should tilt left (negative angle)
+
+        // Smoothly adjust current tilt angle
+        currentTiltAngle = Mathf.Lerp(currentTiltAngle, targetTiltAngle, tiltSpeed * Time.deltaTime);
+
+        // Apply rotation
+        transform.rotation = Quaternion.Euler(0, 0, currentTiltAngle);
 
         // Log information periodically
         if (shouldLog)
         {
-            float percentToEdge = Mathf.Abs((transform.position.x - centerX) / ((maxX - minX) / 2f)) * 100f;
-            Debug.Log($"Hand offset: {handOffset:F4}, Filtered: {filteredOffset.x:F2}, " +
-                     $"Pos X: {transform.position.x:F2}, At wall: {atLeftWall || atRightWall}, " +
-                     $"Percent to edge: {percentToEdge:F1}%, Velocity: {currentVelocity:F2}, Tilt: {tiltAngle:F1}");
+            Debug.Log($"Hand offset: {handOffset:F2}, Target speed: {targetSpeed:F2}, " +
+                      $"Current speed: {currentSpeed:F2}, Position: {transform.position.x:F2}, " +
+                      $"Tilt angle: {currentTiltAngle:F2}");
         }
 
         // Trigger event
@@ -189,28 +152,27 @@ public class Character_NewGame : NetworkBehaviour
 
     public void StartMovement()
     {
-        Debug.Log("Starting movement with high sensitivity");
+        Debug.Log("Starting movement");
         canMove = true;
         isInitialized = false;
+        currentSpeed = 0f;
+        targetSpeed = 0f;
         frameCount = 0;
-        // Reset the filtered offset when starting
-        filteredOffset = Vector3.zero;
-        // Reset rotation
+        currentTiltAngle = 0f;
         transform.rotation = Quaternion.identity;
-        targetRotation = Quaternion.identity;
     }
 
     // Method to change the movement speed
     public void SetMovementSpeed(float newSpeed)
     {
-        movementSpeed = Mathf.Max(0.1f, newSpeed); // Ensure speed doesn't go below 0.1
-        Debug.Log($"Character movement speed set to: {movementSpeed}");
+        maxSpeed = Mathf.Max(0.1f, newSpeed); // Ensure speed doesn't go below 0.1
+        Debug.Log($"Character max speed set to: {maxSpeed}");
     }
 
     // Get the current movement speed
     public float GetMovementSpeed()
     {
-        return movementSpeed;
+        return maxSpeed;
     }
 
     public void GameOver()
@@ -224,7 +186,8 @@ public class Character_NewGame : NetworkBehaviour
         Debug.Log("Spawning balloon");
         canMove = false;
         isInitialized = false;
-        filteredOffset = Vector3.zero;
+        currentSpeed = 0f;
+        targetSpeed = 0f;
 
         // Reset position to center
         transform.position = new Vector3(
@@ -235,6 +198,6 @@ public class Character_NewGame : NetworkBehaviour
 
         // Reset rotation
         transform.rotation = Quaternion.identity;
-        targetRotation = Quaternion.identity;
+        currentTiltAngle = 0f;
     }
 }
