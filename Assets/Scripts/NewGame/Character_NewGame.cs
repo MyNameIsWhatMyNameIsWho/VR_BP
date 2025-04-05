@@ -12,6 +12,13 @@ public class Character_NewGame : NetworkBehaviour
     [SerializeField] private float movementSpeed = 10.0f; // Units per second the cube will move
     [SerializeField] private float smoothingFactor = 0.05f; // How much smoothing to apply (0-1, lower is smoother)
 
+    [Header("Balloon Rotation Animation")]
+    [SerializeField] private float maxTiltAngle = 15f; // Maximum tilt angle (in degrees)
+    [SerializeField] private float tiltSpeed = 3f; // How quickly the balloon tilts (higher = faster)
+    private Quaternion targetRotation; // The rotation we're smoothly moving toward
+    private Vector3 previousPosition; // Used to calculate movement direction
+    private float currentVelocity; // Used to calculate movement direction and speed
+
     [Header("Gesture Control")]
     public bool controllingHandIsLeft = false;
 
@@ -33,6 +40,8 @@ public class Character_NewGame : NetworkBehaviour
     private void Awake()
     {
         lastValidPosition = new Vector3((minX + maxX) / 2f, transform.position.y, transform.position.z);
+        previousPosition = lastValidPosition;
+        targetRotation = Quaternion.identity;
     }
 
     private void Update()
@@ -85,6 +94,9 @@ public class Character_NewGame : NetworkBehaviour
         bool tryingToGoLeft = targetX < transform.position.x;
         bool tryingToGoRight = targetX > transform.position.x;
 
+        // Calculate velocity for balloon tilt animation
+        Vector3 oldPosition = transform.position;
+
         // Only move if we're not at a wall or we're moving away from the wall
         if ((!atLeftWall || !tryingToGoLeft) && (!atRightWall || !tryingToGoRight))
         {
@@ -129,13 +141,24 @@ public class Character_NewGame : NetworkBehaviour
             }
         }
 
+        // Calculate velocity for balloon tilt (how fast we're moving left/right)
+        currentVelocity = (transform.position.x - previousPosition.x) / Time.deltaTime;
+        previousPosition = transform.position;
+
+        // Calculate the target rotation angle based on velocity
+        float tiltAngle = Mathf.Clamp(-currentVelocity * 5f, -maxTiltAngle, maxTiltAngle);
+        targetRotation = Quaternion.Euler(0, 0, tiltAngle);
+
+        // Smoothly rotate toward the target rotation
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, tiltSpeed * Time.deltaTime);
+
         // Log information periodically
         if (shouldLog)
         {
             float percentToEdge = Mathf.Abs((transform.position.x - centerX) / ((maxX - minX) / 2f)) * 100f;
             Debug.Log($"Hand offset: {handOffset:F4}, Filtered: {filteredOffset.x:F2}, " +
                      $"Pos X: {transform.position.x:F2}, At wall: {atLeftWall || atRightWall}, " +
-                     $"Percent to edge: {percentToEdge:F1}%");
+                     $"Percent to edge: {percentToEdge:F1}%, Velocity: {currentVelocity:F2}, Tilt: {tiltAngle:F1}");
         }
 
         // Trigger event
@@ -172,6 +195,9 @@ public class Character_NewGame : NetworkBehaviour
         frameCount = 0;
         // Reset the filtered offset when starting
         filteredOffset = Vector3.zero;
+        // Reset rotation
+        transform.rotation = Quaternion.identity;
+        targetRotation = Quaternion.identity;
     }
 
     // Method to change the movement speed
@@ -195,7 +221,7 @@ public class Character_NewGame : NetworkBehaviour
 
     public void Spawn()
     {
-        Debug.Log("Spawning cube");
+        Debug.Log("Spawning balloon");
         canMove = false;
         isInitialized = false;
         filteredOffset = Vector3.zero;
@@ -206,5 +232,9 @@ public class Character_NewGame : NetworkBehaviour
             transform.position.y,
             transform.position.z
         );
+
+        // Reset rotation
+        transform.rotation = Quaternion.identity;
+        targetRotation = Quaternion.identity;
     }
 }
