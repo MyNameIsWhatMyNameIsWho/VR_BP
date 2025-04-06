@@ -78,22 +78,22 @@ public class Obstacle_NewGame : NetworkBehaviour
 
         if (collision.gameObject.CompareTag("Player"))
         {
-            Debug.Log("Obstacle collided with Player.");
-
             // Mark as collided to prevent further movement and multiple collisions
             hasCollided = true;
 
             // Disable the collider immediately to prevent jittering
             GetComponent<Collider>().enabled = false;
 
-            // End the game via NewGameManager without physically affecting the balloon
+            // Play balloon pop sound
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("BalloonPop");
+            }
+
+            // End the game via NewGameManager
             if (NewGameManager.Instance != null)
             {
                 NewGameManager.Instance.EndGame();
-            }
-            else
-            {
-                Debug.LogError("NewGameManager instance is null on collision.");
             }
         }
     }

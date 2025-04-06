@@ -8,10 +8,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Mirror/Examples/Discovery/Scenes/Scene.unity
     guid: 90fddc74fa21c423599167eb28b09dd1
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/MobileSceneOffline.unity
     guid: 64c108971b8fc924192666a91f109e5e
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/VRSceneOffline.unity
     guid: 016e1b9bad882e1459d45cca2bf32e5e
   - enabled: 1
@@ -28,7 +28,7 @@ EditorBuildSettings:
     guid: 95dba8333e40ac54c85a0220b7cb1331
   - enabled: 1
     path: Assets/Scenes/NewGameSceneOnline.unity
-    guid: dba1b363663e7ef4a8b81cca43d396a6
+    guid: 607f3e82ceba3c447b6d4906c23c2bd3
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: bfa1182bd221b4ca89619141f66f1260, type: 2}
     Unity.XR.WindowsMR.Settings: {fileID: 11400000, guid: dc5a169419fa04987b057f65238cf3ba, type: 2}
