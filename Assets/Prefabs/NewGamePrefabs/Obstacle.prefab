@@ -116,6 +116,9 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
+  enableRotation: 1
+  rotationSpeed: 30
+  rotationAxis: {x: 1, y: 1, z: 1}
 --- !u!1001 &7973183333072588144
 PrefabInstance:
   m_ObjectHideFlags: 0
