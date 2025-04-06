@@ -3,8 +3,19 @@ using Mirror;
 
 public class Obstacle_NewGame : NetworkBehaviour
 {
+    // Original obstacle properties
     private float fallSpeed;
     private bool hasCollided = false;
+
+    // Added rotation properties
+    [Header("Rotation Settings")]
+    [SerializeField] private bool enableRotation = true;
+    [SerializeField] private float rotationSpeed = 30f;
+    [SerializeField] private Vector3 rotationAxis = new Vector3(1, 1, 1); // Rotate on all axes by default
+
+    // For straight falling movement
+    private Vector3 startPosition;
+    private float currentY;
 
     public void Initialize()
     {
@@ -18,14 +29,35 @@ public class Obstacle_NewGame : NetworkBehaviour
             fallSpeed = 0.8f; // Fallback default only used if something goes wrong
             Debug.LogError("NewGameManager.Instance is null in Obstacle Initialize!");
         }
+
+        // Store initial X and Z position to maintain straight line movement
+        startPosition = transform.position;
+        currentY = startPosition.y;
     }
 
     private void Update()
     {
         if (!isServer || hasCollided) return;
 
-        // Move the obstacle downward
-        transform.Translate(Vector3.down * fallSpeed * Time.deltaTime);
+        // Update Y position for straight falling
+        currentY -= fallSpeed * Time.deltaTime;
+
+        // Apply position - maintain original X and Z for straight-line falling
+        transform.position = new Vector3(startPosition.x, currentY, startPosition.z);
+
+        // Apply rotation if enabled (only affects visual rotation, not movement)
+        if (enableRotation)
+        {
+            // Simple rotation on specified axes
+            if (rotationAxis.x != 0)
+                transform.Rotate(rotationSpeed * Time.deltaTime, 0, 0, Space.Self);
+
+            if (rotationAxis.y != 0)
+                transform.Rotate(0, rotationSpeed * Time.deltaTime, 0, Space.Self);
+
+            if (rotationAxis.z != 0)
+                transform.Rotate(0, 0, rotationSpeed * Time.deltaTime, Space.Self);
+        }
 
         // Destroy if it goes out of view
         if (transform.position.y < -10f)
