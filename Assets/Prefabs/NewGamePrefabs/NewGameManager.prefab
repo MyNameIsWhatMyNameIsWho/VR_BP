@@ -1985,6 +1985,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Baloon
       objectReference: {fileID: 0}
+    - target: {fileID: 8653951469775406326, guid: dfc26618d28524549ba4d260abc87e58, type: 3}
+      propertyPath: m_TagString
+      value: Player
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

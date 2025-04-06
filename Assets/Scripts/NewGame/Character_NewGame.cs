@@ -7,6 +7,8 @@ public class Character_NewGame : NetworkBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float minX = -5f;  // Left boundary
     [SerializeField] private float maxX = 5f;   // Right boundary
+    [SerializeField] private float fixedY = 0f; // Fixed Y position - set this to your desired height
+    [SerializeField] private float fixedZ = 0f; // Fixed Z position as well
     [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from walls
     [SerializeField] private float maxSpeed = 10.0f; // Maximum movement speed
     [SerializeField] private float acceleration = 30.0f; // How quickly speed increases
@@ -17,7 +19,6 @@ public class Character_NewGame : NetworkBehaviour
     [Header("Balloon Rotation Animation")]
     [SerializeField] private float maxTiltAngle = 15f; // Maximum tilt angle
     [SerializeField] private float tiltSpeed = 3f; // How quickly the balloon tilts
-    private Quaternion targetRotation;
     private float currentTiltAngle = 0f;
 
     [Header("Gesture Control")]
@@ -35,20 +36,59 @@ public class Character_NewGame : NetworkBehaviour
     private float lastHandX = 0f;
     private float handOffset = 0f;
 
-    // Movement smoothing
-    private float velocityXSmoothing;
-
     // Debugging
     private int frameCount = 0;
 
+    // Center position (exact middle)
+    private Vector3 centerPosition;
+
+    // Rigidbody reference (if any)
+    private Rigidbody rb;
+
     private void Awake()
     {
-        targetRotation = Quaternion.identity;
-        transform.position = new Vector3((minX + maxX) / 2f, transform.position.y, transform.position.z);
+        // Store the exact center position
+        fixedY = fixedY != 0 ? fixedY : transform.position.y;
+        fixedZ = fixedZ != 0 ? fixedZ : transform.position.z;
+        centerPosition = new Vector3((minX + maxX) / 2f, fixedY, fixedZ);
+
+        // Get rigidbody if there is one
+        rb = GetComponent<Rigidbody>();
+
+        // Force initial position
+        ForceResetPosition();
+    }
+
+    // Helper method to completely reset the balloon position and physics
+    private void ForceResetPosition()
+    {
+        // Reset position to exact center
+        transform.position = centerPosition;
+
+        // Reset rotation
+        transform.rotation = Quaternion.identity;
+        currentTiltAngle = 0f;
+
+        // Reset any physics forces if there's a rigidbody
+        if (rb != null)
+        {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.Sleep(); // Force physics engine to reset completely
+        }
     }
 
     private void Update()
     {
+        // Always ensure Y position is fixed, even outside of movement
+        if (transform.position.y != fixedY || transform.position.z != fixedZ)
+        {
+            Vector3 correctedPosition = transform.position;
+            correctedPosition.y = fixedY;
+            correctedPosition.z = fixedZ;
+            transform.position = correctedPosition;
+        }
+
         if (!canMove) return;
 
         // Debugging log counter
@@ -98,9 +138,11 @@ public class Character_NewGame : NetworkBehaviour
         // Smoothly adjust current speed toward target speed
         currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, accelRate * Time.deltaTime);
 
-        // Apply movement
+        // Apply movement - only on X axis, maintain fixed Y and Z
         Vector3 newPosition = transform.position;
         newPosition.x += currentSpeed * Time.deltaTime;
+        newPosition.y = fixedY; // Always maintain fixed Y position
+        newPosition.z = fixedZ; // Always maintain fixed Z position
 
         // Clamp to boundaries
         newPosition.x = Mathf.Clamp(newPosition.x, minX + wallBuffer, maxX - wallBuffer);
@@ -153,13 +195,17 @@ public class Character_NewGame : NetworkBehaviour
     public void StartMovement()
     {
         Debug.Log("Starting movement");
+
+        // Force reset position and physics first
+        ForceResetPosition();
+
+        // Then enable movement
         canMove = true;
         isInitialized = false;
         currentSpeed = 0f;
         targetSpeed = 0f;
         frameCount = 0;
         currentTiltAngle = 0f;
-        transform.rotation = Quaternion.identity;
     }
 
     // Method to change the movement speed
@@ -184,20 +230,13 @@ public class Character_NewGame : NetworkBehaviour
     public void Spawn()
     {
         Debug.Log("Spawning balloon");
+
+        // Force complete reset of position and physics
+        ForceResetPosition();
+
         canMove = false;
         isInitialized = false;
         currentSpeed = 0f;
         targetSpeed = 0f;
-
-        // Reset position to center
-        transform.position = new Vector3(
-            (minX + maxX) / 2f,
-            transform.position.y,
-            transform.position.z
-        );
-
-        // Reset rotation
-        transform.rotation = Quaternion.identity;
-        currentTiltAngle = 0f;
     }
 }

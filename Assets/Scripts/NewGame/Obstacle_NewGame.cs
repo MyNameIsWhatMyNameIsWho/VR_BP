@@ -11,7 +11,9 @@ public class Obstacle_NewGame : NetworkBehaviour
     [Header("Rotation Settings")]
     [SerializeField] private bool enableRotation = true;
     [SerializeField] private float rotationSpeed = 30f;
-    [SerializeField] private Vector3 rotationAxis = new Vector3(1, 1, 1); // Rotate on all axes by default
+    [SerializeField] private bool rotateX = true;
+    [SerializeField] private bool rotateY = true;
+    [SerializeField] private bool rotateZ = true;
 
     // For straight falling movement
     private Vector3 startPosition;
@@ -33,6 +35,13 @@ public class Obstacle_NewGame : NetworkBehaviour
         // Store initial X and Z position to maintain straight line movement
         startPosition = transform.position;
         currentY = startPosition.y;
+
+        // Make sure this doesn't push other objects
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true; // Prevents physical pushing of other objects
+        }
     }
 
     private void Update()
@@ -49,14 +58,11 @@ public class Obstacle_NewGame : NetworkBehaviour
         if (enableRotation)
         {
             // Simple rotation on specified axes
-            if (rotationAxis.x != 0)
-                transform.Rotate(rotationSpeed * Time.deltaTime, 0, 0, Space.Self);
+            float xRotation = rotateX ? rotationSpeed * Time.deltaTime : 0;
+            float yRotation = rotateY ? rotationSpeed * Time.deltaTime : 0;
+            float zRotation = rotateZ ? rotationSpeed * Time.deltaTime : 0;
 
-            if (rotationAxis.y != 0)
-                transform.Rotate(0, rotationSpeed * Time.deltaTime, 0, Space.Self);
-
-            if (rotationAxis.z != 0)
-                transform.Rotate(0, 0, rotationSpeed * Time.deltaTime, Space.Self);
+            transform.Rotate(xRotation, yRotation, zRotation, Space.Self);
         }
 
         // Destroy if it goes out of view
@@ -80,16 +86,7 @@ public class Obstacle_NewGame : NetworkBehaviour
             // Disable the collider immediately to prevent jittering
             GetComponent<Collider>().enabled = false;
 
-            // Freeze the obstacle in place
-            Rigidbody rb = GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                //rb.isKinematic = true;
-                rb.velocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
-
-            // End the game via NewGameManager
+            // End the game via NewGameManager without physically affecting the balloon
             if (NewGameManager.Instance != null)
             {
                 NewGameManager.Instance.EndGame();

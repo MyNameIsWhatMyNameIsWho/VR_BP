@@ -80,7 +80,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 0
-  m_IsKinematic: 1
+  m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -179,6 +179,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 8bcef58e25354c342a485f3d4c9d6d3f, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 5631c92dfa15f5847b4cf72c3c8171e2, type: 2}
     - target: {fileID: 919132149155446097, guid: 8bcef58e25354c342a485f3d4c9d6d3f, type: 3}
       propertyPath: m_Name
       value: rock
