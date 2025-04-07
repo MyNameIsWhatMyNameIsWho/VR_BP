@@ -51,7 +51,6 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private GameObject initialButtons;
     [SerializeField] private GameObject inGameBackButton;
     [SerializeField] private GameObject endgameInfo;
-    // [SerializeField] private GameObject calibrationPrompt; // UI element to show calibration instructions
 
     [Header("Game Settings")]
     [SerializeField] private float movementSpeed = 2.00f;
@@ -65,12 +64,14 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private TextMeshPro timeText;
     [SerializeField] private TextMeshPro endgameScoreText;
     [SerializeField] private TextMeshPro endgameHighScoreText;
+    [SerializeField] private GameAudioTutorial audioTutorial; // Reference to audio tutorial component
 
     private GameMenuManager menuManager;
 
     // Game state variables
     private bool gameRunning = false;
     private bool awaitingCalibration = true; // Flag to indicate we're waiting for initial gesture
+    //private bool tutorialComplete = false;   // Flag to indicate tutorial has finished
     private float gameTimer = 0f;
     private Coroutine spawnCoroutine;
     private bool gameEnding = false; // Flag to prevent multiple EndGame calls
@@ -143,7 +144,6 @@ public class NewGameManager : NetworkBehaviour
             Debug.Log("OnGameStart invoked - hiding UI buttons");
             initialButtons.SetActive(false);
             inGameBackButton.SetActive(true);
-            // DisplayCalibrationPrompt(false);
         });
 
         // Ensure endgame UI is hidden at start
@@ -156,8 +156,12 @@ public class NewGameManager : NetworkBehaviour
             Debug.LogError("endgameInfo reference is missing!");
         }
 
-        // Show calibration prompt at start
-        // DisplayCalibrationPrompt(true);
+        // Ensure audio tutorial plays the first time the game is started
+        if (isServer && audioTutorial != null)
+        {
+            // Delay slightly to ensure everything is loaded
+            StartCoroutine(DelayedFirstAudioInstructions());
+        }
 
         if (!isServer) return;
 
@@ -204,15 +208,13 @@ public class NewGameManager : NetworkBehaviour
 
         // Log highscore
         Debug.Log($"Current highscore: {Highscore}");
-
-        // Play instructions if needed
-        StartCoroutine(PlayInstructions());
     }
 
-    private IEnumerator PlayInstructions()
+    // Coroutine to ensure first instructions play after everything is initialized
+    private IEnumerator DelayedFirstAudioInstructions()
     {
-        yield return null;
-        // Add your audio instructions here if needed
+        yield return new WaitForSeconds(0.5f);
+        audioTutorial.OnGameModeSelected(isCollectionMode);
     }
 
     private void OnGestureDetectedHandler(GestureType gesture, bool isLeft)
@@ -226,12 +228,117 @@ public class NewGameManager : NetworkBehaviour
         // Only process if we're not in the restart cooldown period
         if (restartCooldownTimer <= 0)
         {
-            // Start game if awaiting calibration and not showing endgame
-            if (awaitingCalibration && !endgameInfo.activeSelf && isControllingHand)
+            // Start game if awaiting calibration, not showing endgame, using controlling hand,
+            // and audio tutorial allows calibration
+            if (awaitingCalibration && !endgameInfo.activeSelf && isControllingHand &&
+                (audioTutorial == null || audioTutorial.CanCalibrate()))
             {
                 Debug.Log($"Calibration gesture detected: {gesture} from {(isLeft ? "left" : "right")} hand");
-                StartGame();
+
+                // IMPORTANT FIX: Hide initialButtons and show inGameBackButton here when calibration is detected
+                initialButtons.SetActive(false);
+                inGameBackButton.SetActive(true);
+
+                // Call audio tutorial to start the game with rules
+                if (audioTutorial != null)
+                {
+                    audioTutorial.OnCalibrationComplete(isCollectionMode);
+                }
+                else
+                {
+                    // If no audio tutorial, start game immediately
+                    StartSpawningAfterTutorial();
+                }
+
                 awaitingCalibration = false; // No longer awaiting calibration
+            }
+        }
+    }
+
+    private bool spawningStarted = false;
+
+    // Called by GameAudioTutorial when calibration is complete
+    public void StartCharacterMovementOnly()
+    {
+        if (!isServer) return;
+
+        Debug.Log("Starting character movement after calibration");
+        gameRunning = true;
+
+        // Start character movement only
+        character.StartMovement();
+    }
+
+    // Called by GameAudioTutorial when rules audio finishes
+    public void StartSpawningOnly()
+    {
+        if (!isServer) return;
+
+        Debug.Log("Starting spawning after rules audio");
+
+        // IMPORTANT: Now we're starting spawning, so enable timer and scoring
+        spawningStarted = true;
+
+        // Show timer if in collection mode
+        if (isCollectionMode && timeText != null)
+        {
+            timeText.gameObject.SetActive(true);
+        }
+
+        // Start the appropriate spawning coroutine
+        if (spawnCoroutine != null)
+        {
+            StopCoroutine(spawnCoroutine);
+        }
+
+        if (isCollectionMode)
+        {
+            if (collectiblePrefab != null)
+            {
+                spawnCoroutine = StartCoroutine(SpawnCollectibles());
+                Debug.Log("Started collectible spawning coroutine after rules");
+            }
+        }
+        else
+        {
+            if (obstaclePrefab != null)
+            {
+                spawnCoroutine = StartCoroutine(SpawnObstacles());
+                Debug.Log("Started obstacle spawning coroutine after rules");
+            }
+        }
+    }
+
+    // Legacy method for when there's no audio tutorial
+    public void StartSpawningAfterTutorial()
+    {
+        if (!isServer) return;
+
+        //tutorialComplete = true;
+        gameRunning = true;
+        Debug.Log("Tutorial complete, starting game all at once");
+
+        // Start character movement
+        character.StartMovement();
+
+        // Start the appropriate spawning coroutine
+        if (spawnCoroutine != null)
+        {
+            StopCoroutine(spawnCoroutine);
+        }
+
+        if (isCollectionMode)
+        {
+            if (collectiblePrefab != null)
+            {
+                spawnCoroutine = StartCoroutine(SpawnCollectibles());
+            }
+        }
+        else
+        {
+            if (obstaclePrefab != null)
+            {
+                spawnCoroutine = StartCoroutine(SpawnObstacles());
             }
         }
     }
@@ -245,6 +352,9 @@ public class NewGameManager : NetworkBehaviour
         }
 
         if (!gameRunning) return;
+
+        // IMPORTANT: Only update timer and score if spawning has started
+        if (!spawningStarted) return;
 
         if (isCollectionMode)
         {
@@ -427,9 +537,11 @@ public class NewGameManager : NetworkBehaviour
         if (!isServer || gameRunning) return;
 
         // Reset game state
-        gameRunning = true;
+        gameRunning = false; // We'll set this to true after calibration/tutorial
         gameEnding = false;
-        awaitingCalibration = false; // Calibration complete
+        awaitingCalibration = true; // Set to awaiting calibration
+        //tutorialComplete = false;
+        spawningStarted = false;    // Reset spawning state
         score = 0;
         gameTimer = 0f;
         ChangeScore(0);
@@ -437,7 +549,7 @@ public class NewGameManager : NetworkBehaviour
         // Set time text visibility based on game mode
         if (timeText != null)
         {
-            timeText.gameObject.SetActive(isCollectionMode);
+            timeText.gameObject.SetActive(false); // Hide timer until spawning starts
         }
 
         // Set initial player movement speed
@@ -452,6 +564,10 @@ public class NewGameManager : NetworkBehaviour
             DisplayEndGameInfo(false);
         }
 
+        // IMPORTANT: Keep initialButtons visible at game start, hide inGameBackButton
+        initialButtons.SetActive(true);
+        inGameBackButton.SetActive(false);
+
         // Clear any existing objects
         foreach (var obj in activeObjects.ToArray())
         {
@@ -460,40 +576,11 @@ public class NewGameManager : NetworkBehaviour
         }
         activeObjects.Clear();
 
-        // Kill any existing spawning coroutine
-        if (spawnCoroutine != null)
+        // Start audio tutorial for calibration
+        if (audioTutorial != null)
         {
-            StopCoroutine(spawnCoroutine);
+            audioTutorial.OnGameModeSelected(isCollectionMode);
         }
-
-        // Start appropriate spawning routine
-        if (isCollectionMode)
-        {
-            if (collectiblePrefab != null)
-            {
-                spawnCoroutine = StartCoroutine(SpawnCollectibles());
-                Debug.Log("Started collectible spawning coroutine");
-            }
-            else
-            {
-                Debug.LogError("Collectible prefab is not assigned!");
-            }
-        }
-        else
-        {
-            if (obstaclePrefab != null)
-            {
-                spawnCoroutine = StartCoroutine(SpawnObstacles());
-                Debug.Log("Started obstacle spawning coroutine");
-            }
-            else
-            {
-                Debug.LogError("Obstacle prefab is not assigned!");
-            }
-        }
-
-        // Start character movement
-        character.StartMovement();
 
         // Log game start
         if (LoggerCommunicationProvider.Instance != null)
@@ -507,7 +594,8 @@ public class NewGameManager : NetworkBehaviour
     private IEnumerator SpawnObstacles()
     {
         Debug.Log("SpawnObstacles coroutine started");
-        yield return new WaitForSeconds(1.0f); // Initial delay
+
+        // No need for initial delay - tutorial already provides delay
 
         // Keep track of recent obstacle positions to avoid spawning collectibles too close
         List<Vector3> recentObstaclePositions = new List<Vector3>();
@@ -567,7 +655,8 @@ public class NewGameManager : NetworkBehaviour
     private IEnumerator SpawnCollectibles()
     {
         Debug.Log("SpawnCollectibles coroutine started");
-        yield return new WaitForSeconds(0.5f); // Initial delay
+
+        // No need for initial delay - tutorial already provides delay
 
         // Keep spawning as long as game is running
         while (gameRunning)
@@ -793,12 +882,31 @@ public class NewGameManager : NetworkBehaviour
 
     public void ReturnToMenu()
     {
-        Debug.Log("ReturnToMenu called");
+        //Debug.Log("ReturnToMenu called");
 
         // Make sure game is ended
         if (gameRunning)
         {
             EndGame();
+        }
+
+        // Fix for stuck rays - reset the hand rays before returning to menu
+        if (GestureDetector.Instance != null)
+        {
+            // Reset ray visualization on both hands
+            if (GestureDetector.Instance.handL != null && GestureDetector.Instance.handL.Interactor != null)
+            {
+                GestureDetector.Instance.handL.Interactor.SetRayEndpoints(Vector3.zero, Vector3.zero);
+                GestureDetector.Instance.handL.Interactor.searchesForCollision = true;
+                GestureDetector.Instance.handL.Interactor.visualizesRaycast = true;
+            }
+
+            if (GestureDetector.Instance.handR != null && GestureDetector.Instance.handR.Interactor != null)
+            {
+                GestureDetector.Instance.handR.Interactor.SetRayEndpoints(Vector3.zero, Vector3.zero);
+                GestureDetector.Instance.handR.Interactor.searchesForCollision = true;
+                GestureDetector.Instance.handR.Interactor.visualizesRaycast = true;
+            }
         }
 
         // Return to menu
@@ -837,9 +945,17 @@ public class NewGameManager : NetworkBehaviour
         gameRunning = false;
         gameEnding = false;
         awaitingCalibration = true; // Set to awaiting calibration
+        //tutorialComplete = false;   // Reset tutorial completion
+        spawningStarted = false;    // Reset spawning started flag
         score = 0f;
         gameTimer = 0f;
         ChangeScore(0);
+
+        // Hide timer
+        if (timeText != null)
+        {
+            timeText.gameObject.SetActive(false);
+        }
 
         // Reset hand control
         if (GestureDetector.Instance != null)
@@ -851,14 +967,19 @@ public class NewGameManager : NetworkBehaviour
         // Hide end game UI
         DisplayEndGameInfo(false);
 
-        // Hide initial buttons, show only in-game back button during calibration
-        initialButtons.SetActive(false);
-        inGameBackButton.SetActive(true);
+        // IMPORTANT: Show initialButtons, hide inGameBackButton for restart
+        initialButtons.SetActive(true);
+        inGameBackButton.SetActive(false);
+
+        // Start audio tutorial for calibration again
+        if (audioTutorial != null)
+        {
+            audioTutorial.OnGameModeSelected(isCollectionMode);
+        }
 
         // Don't start the game yet - wait for calibration gesture
         StopAllCoroutines();
     }
-
 
     [ClientRpc]
     private void ChangeScore(int newScore)

@@ -164,10 +164,13 @@ public class Interactor : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void SetRayEndpoints(Vector3 start, Vector3 end)
+    public void SetRayEndpoints(Vector3 start, Vector3 end)
     {
-        lineRenderer?.SetPosition(0, start);
-        lineRenderer?.SetPosition(1, end);
+        if (lineRenderer != null)
+        {
+            lineRenderer.SetPosition(0, start);
+            lineRenderer.SetPosition(1, end);
+        }
     }
 
     public bool IsHandFarFromBackground()

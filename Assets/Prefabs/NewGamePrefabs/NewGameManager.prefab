@@ -187,7 +187,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &8478602764365171012
 Transform:
   m_ObjectHideFlags: 0
@@ -387,6 +387,7 @@ MonoBehaviour:
   initialButtons: {fileID: 2566665300545572651}
   inGameBackButton: {fileID: 8459340216251620434}
   endgameInfo: {fileID: 5881575536552786249}
+  calibrationPrompt: {fileID: 0}
   movementSpeed: 2
   isCollectionMode: 0
   gameTimeLimit: 60
@@ -396,6 +397,7 @@ MonoBehaviour:
   timeText: {fileID: 3702785781749145556}
   endgameScoreText: {fileID: 4499558253332574733}
   endgameHighScoreText: {fileID: 7037428679258922479}
+  audioTutorial: {fileID: 4365303988734149012}
   score: 0
   OnGameStart:
     m_PersistentCalls:
