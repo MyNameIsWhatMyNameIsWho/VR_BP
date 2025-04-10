@@ -51,6 +51,8 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private GameObject initialButtons;
     [SerializeField] private GameObject inGameBackButton;
     [SerializeField] private GameObject endgameInfo;
+    [SerializeField] private TextMeshPro calibrationSuccessText; // Reference to "Calibrated!" text
+    [SerializeField] private float calibrationTextDisplayTime = 2f; // How long to show the text
 
     [Header("Game Settings")]
     [SerializeField] private float movementSpeed = 2.00f;
@@ -219,7 +221,7 @@ public class NewGameManager : NetworkBehaviour
 
     private void OnGestureDetectedHandler(GestureType gesture, bool isLeft)
     {
-        // Only respond to Paper gesture for calibration (ignore Rock gesture)
+        // Only respond to Paper gesture for calibration
         if (gesture != GestureType.Paper) return;
 
         // Check if this is the controlling hand
@@ -235,9 +237,12 @@ public class NewGameManager : NetworkBehaviour
             {
                 Debug.Log($"Calibration gesture detected: {gesture} from {(isLeft ? "left" : "right")} hand");
 
-                // IMPORTANT FIX: Hide initialButtons and show inGameBackButton here when calibration is detected
+                // IMPORTANT: Hide initialButtons and show inGameBackButton here when calibration is detected
                 initialButtons.SetActive(false);
                 inGameBackButton.SetActive(true);
+
+                // Show the calibration success text
+                StartCoroutine(ShowCalibrationSuccessText());
 
                 // Call audio tutorial to start the game with rules
                 if (audioTutorial != null)
@@ -340,6 +345,21 @@ public class NewGameManager : NetworkBehaviour
             {
                 spawnCoroutine = StartCoroutine(SpawnObstacles());
             }
+        }
+    }
+
+    private IEnumerator ShowCalibrationSuccessText()
+    {
+        // Show the text
+        if (calibrationSuccessText != null)
+        {
+            calibrationSuccessText.gameObject.SetActive(true);
+
+            // Wait for the specified time
+            yield return new WaitForSeconds(calibrationTextDisplayTime);
+
+            // Hide the text
+            calibrationSuccessText.gameObject.SetActive(false);
         }
     }
 
@@ -550,6 +570,11 @@ public class NewGameManager : NetworkBehaviour
         if (timeText != null)
         {
             timeText.gameObject.SetActive(false); // Hide timer until spawning starts
+        }
+
+        if (calibrationSuccessText != null)
+        {
+            calibrationSuccessText.gameObject.SetActive(false);
         }
 
         // Set initial player movement speed
@@ -930,6 +955,11 @@ public class NewGameManager : NetworkBehaviour
         if (adaptiveSpawner != null)
         {
             adaptiveSpawner.ResetTracking();
+        }
+
+        if (calibrationSuccessText != null)
+        {
+            calibrationSuccessText.gameObject.SetActive(false);
         }
 
         // Clean up active objects
