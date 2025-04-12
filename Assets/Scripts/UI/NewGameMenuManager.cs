@@ -5,18 +5,47 @@ using UnityEngine;
 public class NewGameMenuManager : GameMenuManager
 {
     private NewGameManager newGameManager;
-    //private bool gameSetupInitialized;
 
-    [ClientRpc]
-    public override void LoadLevel(int level)
+    // Define difficulty settings to allow configuration in the Inspector
+    public enum DifficultyLevel
     {
-        // Call the base method to handle instantiating the level prefab
-        base.LoadLevel(level);
-
-        // After calling base.LoadLevel, the level is spawned asynchronously,
-        // so we start a coroutine to set up the game once it's ready.
-        StartCoroutine(SetupGameAfterLoad(false)); // false = obstacle mode
+        Slow,
+        Medium,
+        Fast
     }
+
+    [System.Serializable]
+    public class DifficultySettings
+    {
+        public float obstacleFallSpeed = 0.8f;
+        public float obstacleSpawnInterval = 4f;
+        public float playerMovementSpeed = 5f;
+    }
+
+    [Header("Difficulty Settings")]
+    [SerializeField]
+    private DifficultySettings slowSettings = new DifficultySettings
+    {
+        obstacleFallSpeed = 0.6f,
+        obstacleSpawnInterval = 5.0f,
+        playerMovementSpeed = 4.0f
+    };
+
+    [SerializeField]
+    private DifficultySettings mediumSettings = new DifficultySettings
+    {
+        obstacleFallSpeed = 0.8f,
+        obstacleSpawnInterval = 4.0f,
+        playerMovementSpeed = 5.0f
+    };
+
+    [SerializeField]
+    private DifficultySettings fastSettings = new DifficultySettings
+    {
+        obstacleFallSpeed = 1.2f,
+        obstacleSpawnInterval = 3.0f,
+        playerMovementSpeed = 6.0f
+    };
 
     [ClientRpc]
     public void LoadCollectibleLevel(int level)
@@ -24,12 +53,32 @@ public class NewGameMenuManager : GameMenuManager
         // Call the base method to handle instantiating the level prefab
         base.LoadLevel(level);
 
-        // After calling base.LoadLevel, the level is spawned asynchronously,
-        // so we start a coroutine to set up the game once it's ready.
-        StartCoroutine(SetupGameAfterLoad(true)); // true = collection mode
+        // After loading, set up the game as collectible mode
+        StartCoroutine(SetupGameAfterLoad(true, DifficultyLevel.Medium)); // Difficulty doesn't matter for collectible mode
     }
 
-    private IEnumerator SetupGameAfterLoad(bool isCollectionMode)
+    [ClientRpc]
+    public void LoadObstacleLevelSlow(int level)
+    {
+        base.LoadLevel(level);
+        StartCoroutine(SetupGameAfterLoad(false, DifficultyLevel.Slow));
+    }
+
+    [ClientRpc]
+    public void LoadObstacleLevelMedium(int level)
+    {
+        base.LoadLevel(level);
+        StartCoroutine(SetupGameAfterLoad(false, DifficultyLevel.Medium));
+    }
+
+    [ClientRpc]
+    public void LoadObstacleLevelFast(int level)
+    {
+        base.LoadLevel(level);
+        StartCoroutine(SetupGameAfterLoad(false, DifficultyLevel.Fast));
+    }
+
+    private IEnumerator SetupGameAfterLoad(bool isCollectionMode, DifficultyLevel difficulty)
     {
         // Wait until the currentlyPlayedLevel is assigned
         while (currentlyPlayedLevel == null) yield return null;
@@ -42,8 +91,14 @@ public class NewGameMenuManager : GameMenuManager
             // Set the game mode
             SetGameMode(isCollectionMode);
 
-           // gameSetupInitialized = true;
-            Debug.Log($"NewGame setup completed successfully. Collection Mode: {isCollectionMode}");
+            // Set difficulty if we're in obstacle mode
+            if (!isCollectionMode)
+            {
+                SetDifficultyLevel(difficulty);
+            }
+
+            Debug.Log($"NewGame setup completed successfully. Collection Mode: {isCollectionMode}, " +
+                      (isCollectionMode ? "" : $"Difficulty: {difficulty}"));
         }
         else
         {
@@ -78,12 +133,68 @@ public class NewGameMenuManager : GameMenuManager
     }
 
     [Command(requiresAuthority = false)]
+    private void SetDifficultyLevel(DifficultyLevel difficulty)
+    {
+        if (newGameManager == null)
+        {
+            Debug.LogError("NewGameManager is null, cannot set difficulty");
+            return;
+        }
+
+        // Use reflection to access private fields in NewGameManager
+        var obstacleSpeedField = typeof(NewGameManager).GetField("obstacleFallSpeed",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        var obstacleIntervalField = typeof(NewGameManager).GetField("obstacleSpawnInterval",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        if (obstacleSpeedField == null || obstacleIntervalField == null)
+        {
+            Debug.LogError("Could not find required fields in NewGameManager");
+            return;
+        }
+
+        // Get the settings for the selected difficulty
+        DifficultySettings settings;
+        string difficultyName;
+
+        switch (difficulty)
+        {
+            case DifficultyLevel.Slow:
+                settings = slowSettings;
+                difficultyName = "Slow";
+                break;
+
+            case DifficultyLevel.Fast:
+                settings = fastSettings;
+                difficultyName = "Fast";
+                break;
+
+            case DifficultyLevel.Medium:
+            default:
+                settings = mediumSettings;
+                difficultyName = "Medium";
+                break;
+        }
+
+        // Apply the settings
+        obstacleSpeedField.SetValue(newGameManager, settings.obstacleFallSpeed);
+        obstacleIntervalField.SetValue(newGameManager, settings.obstacleSpawnInterval);
+        newGameManager.ChangePlayerSpeed(settings.playerMovementSpeed);
+        newGameManager.SetDifficultyForLogging(difficultyName);
+
+        Debug.Log($"Applied {difficulty} difficulty settings to NewGameManager: " +
+                 $"Fall Speed={settings.obstacleFallSpeed}, " +
+                 $"Spawn Interval={settings.obstacleSpawnInterval}, " +
+                 $"Player Speed={settings.playerMovementSpeed}");
+    }
+
+    [Command(requiresAuthority = false)]
     public void CmdResetNewGame()
     {
         if (newGameManager != null)
         {
             newGameManager.RestartGame();
-            return;
         }
         else
         {
@@ -97,7 +208,6 @@ public class NewGameMenuManager : GameMenuManager
         if (newGameManager != null)
         {
             newGameManager.SwitchHands();
-            return;
         }
         else
         {

@@ -34,6 +34,9 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private int collectibleBonusPoints = 5; // Points added for each collectible in obstacle mode
     [SerializeField] private float collectibleSpawnHeightOffset = 1.0f; // Spawn collectibles a bit lower than obstacles
 
+    // Store the difficulty level for logging
+    private string currentDifficultyLevel = "Medium"; // Default value
+
     // Public getters so other scripts can access but not modify these values
     public float ObstacleFallSpeed => obstacleFallSpeed;
     public float CollectibleFallSpeed => collectibleFallSpeed;
@@ -50,6 +53,7 @@ public class NewGameManager : NetworkBehaviour
     [Header("UI Elements")]
     [SerializeField] private GameObject initialButtons;
     [SerializeField] private GameObject inGameBackButton;
+    //[SerializeField] private GameObject switchHandsButton;
     [SerializeField] private GameObject endgameInfo;
     [SerializeField] private TextMeshPro calibrationSuccessText; // Reference to "Calibrated!" text
     [SerializeField] private float calibrationTextDisplayTime = 2f; // How long to show the text
@@ -210,6 +214,13 @@ public class NewGameManager : NetworkBehaviour
 
         // Log highscore
         Debug.Log($"Current highscore: {Highscore}");
+    }
+
+    // Method to set difficulty for logging
+    public void SetDifficultyForLogging(string difficultyLevel)
+    {
+        currentDifficultyLevel = difficultyLevel;
+        Debug.Log($"Difficulty level set to: {currentDifficultyLevel}");
     }
 
     // Coroutine to ensure first instructions play after everything is initialized
@@ -500,6 +511,14 @@ public class NewGameManager : NetworkBehaviour
                 LoggerCommunicationProvider.Instance.AddToCustomData("newgame_highscore", "\"" + Highscore.ToString() + "\"");
                 LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode",
                     isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
+
+                // Add difficulty level logging when in obstacle mode
+                if (!isCollectionMode)
+                {
+                    LoggerCommunicationProvider.Instance.AddToCustomData("newgame_difficulty",
+                        $"\"{currentDifficultyLevel}\"");
+                }
+
                 LoggerCommunicationProvider.Instance.StopLogging();
             }
         }
