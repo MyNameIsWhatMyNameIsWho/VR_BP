@@ -53,8 +53,8 @@ MonoBehaviour:
   syncInterval: 0
   baseMovementSpeed: 0.75
   debugMode: 1
-  minDistanceFromPlayer: 0.5
-  maxDistanceFromPlayer: 1.5
+  minDistanceFromPlayer: 0.4
+  maxDistanceFromPlayer: 1
   OnMothCaught:
     m_PersistentCalls:
       m_Calls: []
