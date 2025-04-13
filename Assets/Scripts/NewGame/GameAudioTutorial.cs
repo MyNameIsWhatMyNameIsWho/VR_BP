@@ -4,85 +4,89 @@ using Mirror;
 
 public class GameAudioTutorial : NetworkBehaviour
 {
-    [Header("Tutorial Audio Clips")]
-    [SerializeField] private AudioClip calibrationInstructionClip; // "Calibrate your hand" clip
-    [SerializeField] private AudioClip rulesObstaclesClip;         // Rules for obstacle mode 
-    [SerializeField] private AudioClip rulesCollectClip;           // Rules for collection mode
+    [Header("Audio Clips")]
+    [SerializeField] private AudioClip calibrationInstructionClip; // Audio for hand calibration instructions
+    [SerializeField] private AudioClip rulesObstaclesClip;        // Audio for obstacle mode rules
+    [SerializeField] private AudioClip rulesCollectClip;          // Audio for collection mode rules
 
-    [Header("Settings")]
-    [SerializeField] private float calibrationReminderDelay = 15f; // Seconds before reminding about calibration
-    //[SerializeField] private float delayAfterRules = 2f;           // Seconds to wait after rules before spawning
+    [Header("Timing Settings")]
+    [SerializeField] private float calibrationReminderDelay = 15f; // Time between calibration reminders
     [SerializeField] private float minCalibrationDelay = 3f;       // Minimum time before allowing calibration
-    [SerializeField] private float rulesStartDelay = 8f;          // Seconds to wait after rules start before spawning objects
+    [SerializeField] private float rulesStartDelay = 8f;          // Time after rules start before spawning objects
 
+    // Private Components
     private AudioSource audioSource;
+    private NewGameManager gameManager;
+
+    // State Management
     private Coroutine reminderCoroutine;
     private Coroutine gameStartCoroutine;
     private bool calibrationComplete = false;
-    private bool canCalibrate = false;  // Flag to delay calibration until after instructions
-
-    private NewGameManager gameManager;
+    private bool canCalibrate = false;
 
     private void Awake()
+    {
+        SetupAudioSource();
+    }
+
+    private void Start()
+    {
+        InitializeGameManager();
+    }
+
+    private void SetupAudioSource()
     {
         audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
         audioSource.loop = false;
     }
 
-    private void Start()
+    private void InitializeGameManager()
     {
         gameManager = NewGameManager.Instance;
         if (gameManager == null)
         {
             Debug.LogError("GameAudioTutorial: Could not find NewGameManager instance");
-            return;
         }
     }
 
-    // Call this when game mode is selected
     public void OnGameModeSelected(bool isCollectionMode)
+    {
+        ResetGameState();
+        StartGameSequence(isCollectionMode);
+    }
+
+    private void ResetGameState()
     {
         calibrationComplete = false;
         canCalibrate = false;
+        StopAllCoroutines();
+    }
 
-        // Stop any previous coroutines
-        if (reminderCoroutine != null)
-            StopCoroutine(reminderCoroutine);
-        if (gameStartCoroutine != null)
-            StopCoroutine(gameStartCoroutine);
-
-        // Play calibration instructions
+    private void StartGameSequence(bool isCollectionMode)
+    {
         PlayCalibrationInstructions();
-
-        // Start a delay before allowing calibration
         StartCoroutine(EnableCalibrationAfterDelay());
-
-        // Start reminder coroutine
         reminderCoroutine = StartCoroutine(CalibrationReminderRoutine());
     }
 
-    // Call this when calibration is complete
     public void OnCalibrationComplete(bool isCollectionMode)
     {
         calibrationComplete = true;
+        StopReminderCoroutine();
+        StartCoroutine(PlayRulesThenStartGame(isCollectionMode));
+    }
 
-        // Stop reminder coroutine
+    private void StopReminderCoroutine()
+    {
         if (reminderCoroutine != null)
         {
             StopCoroutine(reminderCoroutine);
             reminderCoroutine = null;
         }
-
-        // Play appropriate rules after a short delay
-        StartCoroutine(PlayRulesThenStartGame(isCollectionMode));
     }
 
-    // Check if enough time has passed to allow calibration
-    public bool CanCalibrate()
-    {
-        return canCalibrate;
-    }
+    public bool CanCalibrate() => canCalibrate;
 
     private IEnumerator EnableCalibrationAfterDelay()
     {
@@ -106,10 +110,8 @@ public class GameAudioTutorial : NetworkBehaviour
     {
         while (!calibrationComplete)
         {
-            // Wait for specified time
             yield return new WaitForSeconds(calibrationReminderDelay);
-
-            // If calibration still not done and not currently playing audio
+            
             if (!calibrationComplete && !audioSource.isPlaying)
             {
                 PlayCalibrationInstructions();
@@ -119,23 +121,23 @@ public class GameAudioTutorial : NetworkBehaviour
 
     private IEnumerator PlayRulesThenStartGame(bool isCollectionMode)
     {
-        // Wait a moment before playing rules
         yield return new WaitForSeconds(0.5f);
-
-        // Play appropriate rules
         PlayGameRules(isCollectionMode);
+        StartCharacterMovement();
+        yield return new WaitForSeconds(rulesStartDelay);
+        StartObjectSpawning();
+    }
 
-        // Enable character movement immediately after rules start playing
+    private void StartCharacterMovement()
+    {
         if (gameManager != null)
         {
-            // Start character movement but don't spawn obstacles yet
             gameManager.StartCharacterMovementOnly();
         }
+    }
 
-        // Wait for the fixed delay instead of waiting for audio to finish
-        yield return new WaitForSeconds(rulesStartDelay);
-
-        // Tell game manager to start spawning objects
+    private void StartObjectSpawning()
+    {
         if (gameManager != null)
         {
             gameManager.StartSpawningOnly();
