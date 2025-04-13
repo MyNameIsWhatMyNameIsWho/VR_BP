@@ -2133,16 +2133,16 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   slowSettings:
-    obstacleFallSpeed: 1.2
-    obstacleSpawnInterval: 5
-    playerMovementSpeed: 4
-  mediumSettings:
     obstacleFallSpeed: 2
     obstacleSpawnInterval: 4
+    playerMovementSpeed: 4
+  mediumSettings:
+    obstacleFallSpeed: 3
+    obstacleSpawnInterval: 3
     playerMovementSpeed: 5
   fastSettings:
-    obstacleFallSpeed: 3.5
-    obstacleSpawnInterval: 3
+    obstacleFallSpeed: 5
+    obstacleSpawnInterval: 2
     playerMovementSpeed: 6
 --- !u!114 &2086615233020867608
 MonoBehaviour:
