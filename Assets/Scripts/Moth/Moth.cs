@@ -13,6 +13,10 @@ public class Moth : NetworkBehaviour
     [SerializeField] private float minDistanceFromPlayer = 0.5f;
     [SerializeField] private float maxDistanceFromPlayer = 1.5f;
 
+    [Header("Flying Area")]
+    [SerializeField] private float flyingHeight = 0.8f;  // Controls how high/low the moth can fly (0.8 = 0.4 up and 0.4 down)
+    [SerializeField] private float flyingWidth = 1.0f;   // Controls how far left/right the moth can fly (1.0 = 0.5 left and 0.5 right)
+
     // Current movement parameters
     private Vector3 targetPosition;
     private float currentSpeed;
@@ -133,21 +137,25 @@ public class Moth : NetworkBehaviour
                 return;
             }
 
-            // Get camera position and forward
+            // Get camera position
             Vector3 cameraPosition = mainCamera.transform.position;
-            Vector3 cameraForward = mainCamera.transform.forward;
+
+            // Fixed forward direction (slightly upward)
+            Vector3 fixedForward = Vector3.forward;
+            fixedForward.y = 0.4f; // Slight upward tilt
+            fixedForward.Normalize();
 
             // Random distance in front of camera
             float distance = UnityEngine.Random.Range(minDistanceFromPlayer, maxDistanceFromPlayer);
 
-            // Random vertical offset (-0.3 to 0.5 biased upward)
-            float yOffset = UnityEngine.Random.Range(-0.3f, 0.5f);
+            // Random vertical offset using flyingHeight
+            float yOffset = UnityEngine.Random.Range(-flyingHeight/2f, flyingHeight/2f);
 
-            // Random horizontal offset
-            float xOffset = UnityEngine.Random.Range(-0.5f, 0.5f);
+            // Random horizontal offset using flyingWidth
+            float xOffset = UnityEngine.Random.Range(-flyingWidth/2f, flyingWidth/2f);
 
             // Calculate target position
-            targetPosition = cameraPosition + cameraForward * distance;
+            targetPosition = cameraPosition + fixedForward * distance;
             targetPosition.y += yOffset;
             targetPosition.x += xOffset;
 

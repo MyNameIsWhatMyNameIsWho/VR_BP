@@ -477,34 +477,33 @@ public class MothGameManager : NetworkBehaviour
             Debug.LogWarning("MothGameManager: Error recording event: " + e.Message);
         }
 
-        // Respawn after delay
-        StartCoroutine(RespawnMothAfterDelay(moth));
+        // Immediately destroy the caught moth
+        if (moth != null)
+        {
+            NetworkServer.Destroy(moth.gameObject);
+            activeMoths.Remove(moth.gameObject);
+        }
+
+        // Spawn new moth after delay
+        StartCoroutine(SpawnNewMothAfterDelay());
     }
 
-    private IEnumerator RespawnMothAfterDelay(Moth moth)
+    private IEnumerator SpawnNewMothAfterDelay()
     {
-        if (debugMode) Debug.Log("MothGameManager: Starting respawn delay");
+        if (debugMode) Debug.Log("MothGameManager: Starting spawn delay");
 
-        // Wait before respawning
+        // Wait before spawning new moth
         yield return new WaitForSeconds(respawnDelay);
 
-        // Respawn if game still running
+        // Spawn if game still running
         if (gameRunning)
         {
-            if (moth != null)
-            {
-                if (debugMode) Debug.Log("MothGameManager: Respawning moth");
-                moth.Respawn();
-            }
-            else
-            {
-                if (debugMode) Debug.Log("MothGameManager: Moth was destroyed, spawning new one");
-                SpawnMoth();
-            }
+            if (debugMode) Debug.Log("MothGameManager: Spawning new moth");
+            SpawnMoth();
         }
         else
         {
-            if (debugMode) Debug.Log("MothGameManager: Game not running, skipping respawn");
+            if (debugMode) Debug.Log("MothGameManager: Game not running, skipping spawn");
         }
     }
 
