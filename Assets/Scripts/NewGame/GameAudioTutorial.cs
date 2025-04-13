@@ -11,8 +11,9 @@ public class GameAudioTutorial : NetworkBehaviour
 
     [Header("Settings")]
     [SerializeField] private float calibrationReminderDelay = 15f; // Seconds before reminding about calibration
-    [SerializeField] private float delayAfterRules = 2f;           // Seconds to wait after rules before spawning
+    //[SerializeField] private float delayAfterRules = 2f;           // Seconds to wait after rules before spawning
     [SerializeField] private float minCalibrationDelay = 3f;       // Minimum time before allowing calibration
+    [SerializeField] private float rulesStartDelay = 8f;          // Seconds to wait after rules start before spawning objects
 
     private AudioSource audioSource;
     private Coroutine reminderCoroutine;
@@ -131,9 +132,8 @@ public class GameAudioTutorial : NetworkBehaviour
             gameManager.StartCharacterMovementOnly();
         }
 
-        // Wait for audio to finish plus a small delay
-        float clipLength = audioSource.clip ? audioSource.clip.length : 0;
-        yield return new WaitForSeconds(clipLength + delayAfterRules);
+        // Wait for the fixed delay instead of waiting for audio to finish
+        yield return new WaitForSeconds(rulesStartDelay);
 
         // Tell game manager to start spawning objects
         if (gameManager != null)

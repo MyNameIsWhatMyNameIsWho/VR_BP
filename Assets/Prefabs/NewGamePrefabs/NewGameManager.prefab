@@ -392,11 +392,9 @@ MonoBehaviour:
   calibrationInstructionClip: {fileID: 8300000, guid: 652f4a4b22d89fa4ba3111bcdffe2e39, type: 3}
   rulesObstaclesClip: {fileID: 8300000, guid: f7ad4f6b952c2534583ea254c387f71e, type: 3}
   rulesCollectClip: {fileID: 8300000, guid: c4de39e59435f564b80660616b8c6052, type: 3}
-  calibrationReminderDelay: 8
-  delayAfterRules: 1
-  minCalibrationDelay: 5
-  earlyGameStartTime: 8
-  additionalSpawnDelay: 1
+  calibrationReminderDelay: 6
+  minCalibrationDelay: 9
+  rulesStartDelay: 9
 --- !u!1 &2564634328533977816
 GameObject:
   m_ObjectHideFlags: 0
@@ -558,7 +556,7 @@ MonoBehaviour:
   collectibleSpawnHeightOffset: 1
   obstacleSpawnInterval: 4
   collectibleSpawnInterval: 5
-  objectSpawnY: 15
+  objectSpawnY: 10
   initialButtons: {fileID: 2566665300545572651}
   inGameBackButton: {fileID: 8459340216251620434}
   endgameInfo: {fileID: 5881575536552786249}
