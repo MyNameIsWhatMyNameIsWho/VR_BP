@@ -55,6 +55,10 @@ public class MainMenuManager : NetworkBehaviour
                 //new game scene
                 if (isServer) CustomNetworkManager.singleton.ServerChangeScene("NewGameSceneOnline");
                 break;
+            case 4:
+                //moth scene
+                if (isServer) CustomNetworkManager.singleton.ServerChangeScene("MothSceneOnline");
+                break;
         }
     }
 

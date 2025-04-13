@@ -29,9 +29,13 @@ public class User
     public float HighscoreWithObstacles = 0;
     public float HighscoreWithoutObstacles = 0;
 
+    //moth game
+    public float HighscoreMothGame = 0;
+
     public GestureList gestures;
 
-    public User() {
+    public User()
+    {
         gestures = new GestureList();
     }
 
@@ -41,7 +45,8 @@ public class User
         Nickname = nickname;
     }
 
-    public User(UserSave userSave) {
+    public User(UserSave userSave)
+    {
         gestures = new GestureList();
         Nickname = userSave.Nickname;
 
@@ -66,11 +71,17 @@ public class User
         HighscoreWithObstacles = userSave.HighscoreWithObstacles;
         HighscoreWithoutObstacles = userSave.HighscoreWithoutObstacles;
 
+        //moth game (handle gracefully if loading from older save)
+        if (userSave.GetType().GetField("HighscoreMothGame") != null)
+        {
+            HighscoreMothGame = userSave.HighscoreMothGame;
+        }
+
         if (userSave.gestures == null) return;
 
         foreach (var item in userSave.gestures)
         {
-            gestures.gestures.Add(new Gesture(item));           
+            gestures.gestures.Add(new Gesture(item));
         };
     }
 }
@@ -101,6 +112,9 @@ public class UserSave
     public float HighscoreWithObstacles = 0;
     public float HighscoreWithoutObstacles = 0;
 
+    //moth game
+    public float HighscoreMothGame = 0;
+
     public GestureSave[] gestures;
 
     public UserSave(User user)
@@ -128,8 +142,11 @@ public class UserSave
         HighscoreWithObstacles = user.HighscoreWithObstacles;
         HighscoreWithoutObstacles = user.HighscoreWithoutObstacles;
 
+        //moth game
+        HighscoreMothGame = user.HighscoreMothGame;
+
         if (user.gestures == null) return;
-        
+
         gestures = new GestureSave[user.gestures.gestures.Count];
 
         int i = 0;

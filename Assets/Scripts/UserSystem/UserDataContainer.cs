@@ -43,19 +43,24 @@ public class UserDataContainer
     public float HighscoreWithObstacles { get { return _users[_activeUserID].HighscoreWithObstacles; } set { _users[_activeUserID].HighscoreWithObstacles = value; SaveUsers(); } }
     public float HighscoreWithoutObstacles { get { return _users[_activeUserID].HighscoreWithoutObstacles; } set { _users[_activeUserID].HighscoreWithoutObstacles = value; SaveUsers(); } }
 
+    //moth game
+    public float HighscoreMothGame { get { return _users[_activeUserID].HighscoreMothGame; } set { _users[_activeUserID].HighscoreMothGame = value; SaveUsers(); } }
+
     public GestureList GestureList { get { return _users[_activeUserID].gestures; } }
 
-    public bool SetActiveUser(string nickname) {
+    public bool SetActiveUser(string nickname)
+    {
         _activeUserID = _users.FindIndex((u) => u.Nickname == nickname);
         return _activeUserID > -1;
     }
 
-    public void AddUser(string nickname) {
+    public void AddUser(string nickname)
+    {
         _users.Add(new User(nickname));
         SaveUsers();
         OnUsersChange.Invoke();
     }
-    
+
     public void RemoveUser(string nickname)
     {
         _users.RemoveAll((u) => u.Nickname == nickname);
@@ -63,10 +68,12 @@ public class UserDataContainer
         OnUsersChange.Invoke();
     }
 
-    public void LoadUsers() {
+    public void LoadUsers()
+    {
         string path = Application.persistentDataPath + "/Users.save";
         Debug.Log(path);
-        if (File.Exists(path)) {
+        if (File.Exists(path))
+        {
             Debug.Log(path);
             BinaryFormatter bf = new BinaryFormatter();
             FileStream stream = new FileStream(path, FileMode.Open);
@@ -74,8 +81,9 @@ public class UserDataContainer
             UserSave[] usersArray = bf.Deserialize(stream) as UserSave[];
             _users = new List<User>();
 
-            foreach (var item in usersArray) {
-                _users.Add(new User(item));    
+            foreach (var item in usersArray)
+            {
+                _users.Add(new User(item));
             }
 
             stream.Close();
@@ -109,7 +117,8 @@ public class UserDataContainer
         stream.Close();
     }
 
-    public void AddGesture(Gesture gesture) {
+    public void AddGesture(Gesture gesture)
+    {
         _users[_activeUserID].gestures.gestures.Add(gesture);
         SaveUsers();
     }

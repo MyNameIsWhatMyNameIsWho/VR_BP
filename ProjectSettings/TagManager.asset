@@ -12,6 +12,7 @@ TagManager:
   - SoundTrigger
   - InvulnerabilityBubble
   - Obstacle
+  - Moth
   layers:
   - Default
   - TransparentFX

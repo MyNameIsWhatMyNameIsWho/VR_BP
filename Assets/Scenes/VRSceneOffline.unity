@@ -613,6 +613,18 @@ PrefabInstance:
       propertyPath: offlineScene
       value: Assets/Scenes/VRSceneOffline.unity
       objectReference: {fileID: 0}
+    - target: {fileID: 6755426703630840144, guid: 8cb0c39ca7df47e4d8d0e87b591c1925, type: 3}
+      propertyPath: spawnPrefabs.Array.size
+      value: 43
+      objectReference: {fileID: 0}
+    - target: {fileID: 6755426703630840144, guid: 8cb0c39ca7df47e4d8d0e87b591c1925, type: 3}
+      propertyPath: spawnPrefabs.Array.data[43]
+      value: 
+      objectReference: {fileID: 5650805428155763147, guid: 8ce35b9d1999b3f4d8cde75595918a23, type: 3}
+    - target: {fileID: 6755426703630840144, guid: 8cb0c39ca7df47e4d8d0e87b591c1925, type: 3}
+      propertyPath: spawnPrefabs.Array.data[44]
+      value: 
+      objectReference: {fileID: 3093340971583618290, guid: e30095452b9a6974e809866b375ba6d2, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
