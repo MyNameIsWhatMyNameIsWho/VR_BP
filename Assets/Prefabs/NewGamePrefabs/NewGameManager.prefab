@@ -270,7 +270,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Calibrated!
+  m_text: "Zkalibrov\xE1no!"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: af4b1194e9cd4b547b9c6fe137884dfc, type: 2}
   m_sharedMaterial: {fileID: 1327729394593832536, guid: af4b1194e9cd4b547b9c6fe137884dfc, type: 2}
@@ -389,12 +389,14 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  calibrationInstructionClip: {fileID: 8300000, guid: d4db05a3fad056c48ad1ceb7db45d01d, type: 3}
-  rulesObstaclesClip: {fileID: 8300000, guid: df600eac7e8628f4882f4532399adfee, type: 3}
-  rulesCollectClip: {fileID: 8300000, guid: df600eac7e8628f4882f4532399adfee, type: 3}
-  calibrationReminderDelay: 5
-  delayAfterRules: 2
-  minCalibrationDelay: 3
+  calibrationInstructionClip: {fileID: 8300000, guid: 652f4a4b22d89fa4ba3111bcdffe2e39, type: 3}
+  rulesObstaclesClip: {fileID: 8300000, guid: f7ad4f6b952c2534583ea254c387f71e, type: 3}
+  rulesCollectClip: {fileID: 8300000, guid: c4de39e59435f564b80660616b8c6052, type: 3}
+  calibrationReminderDelay: 8
+  delayAfterRules: 1
+  minCalibrationDelay: 5
+  earlyGameStartTime: 8
+  additionalSpawnDelay: 1
 --- !u!1 &2564634328533977816
 GameObject:
   m_ObjectHideFlags: 0
