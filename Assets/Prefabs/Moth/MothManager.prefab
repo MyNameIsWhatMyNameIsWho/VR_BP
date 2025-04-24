@@ -464,11 +464,9 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   gameDuration: 60
-  respawnDelay: 1
+  respawnDelay: 2
   scorePerMoth: 1
-  difficulty: 5
   timedMode: 1
-  debugMode: 1
   mothPrefab: {fileID: 5650805428155763147, guid: 8ce35b9d1999b3f4d8cde75595918a23, type: 3}
   maxActiveMoths: 4
   zoneCenter: {x: 0, y: 2.2, z: 0.43}

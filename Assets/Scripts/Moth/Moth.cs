@@ -6,12 +6,10 @@ using UnityEngine.Events;
 public class Moth : NetworkBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 0.3f;
+    [SerializeField] private float moveSpeed = 0.5f;
     [SerializeField] private float changeDirectionTime = 3f;
-    [SerializeField] private bool debugMode = false;
 
-    // Zone settings (will be set by MothGameManager)
-    [Header("Flying Zone")]
+    // Zone settings (set by MothGameManager)
     [HideInInspector] public Vector3 zoneCenter = new Vector3(0, 1.5f, 1f);
     [HideInInspector] public Vector3 zoneSize = new Vector3(2f, 1f, 1f);
 
@@ -23,7 +21,7 @@ public class Moth : NetworkBehaviour
     private float nextChangeTime;
     private bool isActive = true;
 
-    public void Initialize(float difficulty)
+    public void Initialize()
     {
         // Set random color
         MeshRenderer renderer = GetComponent<MeshRenderer>();
@@ -35,9 +33,6 @@ public class Moth : NetworkBehaviour
                 UnityEngine.Random.Range(0.5f, 1.0f)
             );
         }
-
-        // Set speed based on difficulty
-        moveSpeed *= difficulty;
 
         // Pick a random direction
         PickNewDirection();
@@ -128,19 +123,9 @@ public class Moth : NetworkBehaviour
         }
     }
 
-    public void SetDifficulty(float difficulty)
-    {
-        moveSpeed = 0.3f * difficulty; // Reset to base speed times difficulty
-    }
-
     private void OnTriggerEnter(Collider other)
     {
         if (!isServer || !isActive) return;
-
-        if (debugMode)
-        {
-            Debug.Log($"Moth: Collision with {other.gameObject.name}, layer: {LayerMask.LayerToName(other.gameObject.layer)}");
-        }
 
         // Check for player hands
         if (other.gameObject.layer == LayerMask.NameToLayer("PlayerHands"))

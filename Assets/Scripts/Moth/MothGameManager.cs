@@ -7,10 +7,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Manages the Moth Game - a game where players reach to catch flying moths.
-/// Designed for arm stretching rehabilitation.
-/// </summary>
 public class MothGameManager : NetworkBehaviour
 {
     public static MothGameManager Instance;
@@ -19,9 +15,7 @@ public class MothGameManager : NetworkBehaviour
     [SerializeField] private float gameDuration = 60f; // Game length in seconds
     [SerializeField] private float respawnDelay = 1.0f; // Delay before spawning a new moth
     [SerializeField] private int scorePerMoth = 1; // Points earned per catch
-    [SerializeField] private float difficulty = 1.0f; // Speed multiplier (1.0 = normal)
     [SerializeField] private bool timedMode = true; // If false, continues until player quits
-    [SerializeField] private bool debugMode = true; // Enable detailed logging
 
     [Header("Spawn Settings")]
     [SerializeField] private GameObject mothPrefab;
@@ -30,8 +24,8 @@ public class MothGameManager : NetworkBehaviour
     [SerializeField] private Vector3 zoneSize = new Vector3(2f, 1f, 1f); // Size of moth flying zone
 
     [Header("UI Elements")]
-    [SerializeField] private GameObject initialButtons;
-    [SerializeField] private GameObject inGameButton;
+    public GameObject initialButtons;
+    public GameObject inGameButton;
     [SerializeField] private GameObject endgameInfo;
     [SerializeField] private TextMeshPro scoreText;
     [SerializeField] private TextMeshPro timeText;
@@ -47,6 +41,7 @@ public class MothGameManager : NetworkBehaviour
     private int totalMothsCaught = 0;
     private int totalMothsSpawned = 0;
     private List<GameObject> activeMoths = new List<GameObject>();
+    private bool isWaitingForRespawn = false;
 
     // Events
     public UnityEvent OnGameStart;
@@ -87,26 +82,18 @@ public class MothGameManager : NetworkBehaviour
             return;
         }
         Instance = this;
-
-        if (debugMode) Debug.Log("MothGameManager: Awake");
     }
 
     private void Start()
     {
-        if (debugMode) Debug.Log("MothGameManager: Start");
-
         menuManager = FindFirstObjectByType<GameMenuManager>();
-        if (menuManager == null && debugMode)
-            Debug.LogWarning("MothGameManager: MenuManager not found");
 
         OnGameEnd.AddListener(() => {
-            if (debugMode) Debug.Log("MothGameManager: OnGameEnd event triggered");
             initialButtons.SetActive(true);
             inGameButton.SetActive(false);
         });
 
         OnGameStart.AddListener(() => {
-            if (debugMode) Debug.Log("MothGameManager: OnGameStart event triggered");
             initialButtons.SetActive(false);
             inGameButton.SetActive(true);
         });
@@ -115,16 +102,8 @@ public class MothGameManager : NetworkBehaviour
         {
             endgameInfo.SetActive(false);
         }
-        else if (debugMode)
-        {
-            Debug.LogWarning("MothGameManager: endgameInfo is null");
-        }
 
-        if (!isServer)
-        {
-            if (debugMode) Debug.Log("MothGameManager: Not server, returning from Start");
-            return;
-        }
+        if (!isServer) return;
 
         // Hide timer if not in timed mode
         if (!timedMode && timeText != null)
@@ -137,38 +116,18 @@ public class MothGameManager : NetworkBehaviour
 
         // Start with instructions
         StartCoroutine(PlayInstructions());
-
-        if (debugMode) Debug.Log("MothGameManager: Start completed");
-
-        // Check if moth prefab is assigned
-        if (mothPrefab == null)
-        {
-            Debug.LogError("MothGameManager: mothPrefab is not assigned!");
-        }
     }
 
     private IEnumerator PlayInstructions()
     {
-        if (debugMode) Debug.Log("MothGameManager: Playing instructions");
         yield return null;
-
-        // Simply wait a few seconds before starting
         yield return new WaitForSeconds(3.0f);
-
-        if (debugMode) Debug.Log("MothGameManager: Instructions completed");
     }
 
     private void Update()
     {
-        if (!isServer)
-        {
-            return;
-        }
-
-        if (!gameRunning)
-        {
-            return;
-        }
+        if (!isServer) return;
+        if (!gameRunning) return;
 
         // Maintain exactly 4 moths at all times
         MaintainExactlyFourMoths();
@@ -184,7 +143,6 @@ public class MothGameManager : NetworkBehaviour
             // Check if time is up
             if (gameTimer >= gameDuration)
             {
-                if (debugMode) Debug.Log("MothGameManager: Time's up, ending game");
                 EndGame();
                 return;
             }
@@ -221,8 +179,8 @@ public class MothGameManager : NetworkBehaviour
             }
         }
 
-        // If we need more moths, add them
-        if (currentMothCount < 4)
+        // If we need more moths and we're not waiting for respawn delay
+        if (currentMothCount < 4 && !isWaitingForRespawn)
         {
             for (int i = 0; i < 4 - currentMothCount; i++)
             {
@@ -248,13 +206,7 @@ public class MothGameManager : NetworkBehaviour
     [ClientRpc]
     public void EndGame()
     {
-        if (!gameRunning)
-        {
-            if (debugMode && isServer) Debug.Log("MothGameManager: EndGame called but game not running");
-            return;
-        }
-
-        if (debugMode && isServer) Debug.Log("MothGameManager: Ending game");
+        if (!gameRunning) return;
 
         // Stop the game
         gameRunning = false;
@@ -269,14 +221,17 @@ public class MothGameManager : NetworkBehaviour
 
     private IEnumerator EndGameCoroutine()
     {
-        if (debugMode) Debug.Log("MothGameManager: Running EndGameCoroutine");
+        // Hide time text when game ends
+        if (timeText != null)
+        {
+            timeText.gameObject.SetActive(false);
+        }
 
         // Clean up active moths
         foreach (var moth in activeMoths)
         {
             if (moth != null)
             {
-                if (debugMode) Debug.Log("MothGameManager: Destroying moth during end game");
                 NetworkServer.Destroy(moth);
             }
         }
@@ -288,7 +243,6 @@ public class MothGameManager : NetworkBehaviour
         // Update highscore if needed
         if (Highscore < score)
         {
-            if (debugMode) Debug.Log($"MothGameManager: New highscore: {score} (old: {Highscore})");
             Highscore = score;
         }
 
@@ -309,20 +263,22 @@ public class MothGameManager : NetworkBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError("MothGameManager: Error logging end game data: " + e.Message);
+            Debug.LogError("Error logging end game data: " + e.Message);
         }
     }
 
     [ClientRpc]
     private void DisplayEndGameInfo(bool display, float highscore, float finalScore)
     {
-        if (endgameInfo == null)
-        {
-            if (debugMode && isServer) Debug.LogWarning("MothGameManager: endgameInfo is null in DisplayEndGameInfo");
-            return;
-        }
+        if (endgameInfo == null) return;
 
         endgameInfo.SetActive(display);
+
+        // Always hide time text when showing end game info
+        if (display && timeText != null)
+        {
+            timeText.gameObject.SetActive(false);
+        }
 
         if (!display) return;
 
@@ -330,18 +286,10 @@ public class MothGameManager : NetworkBehaviour
         {
             finalScoreText.text = Mathf.RoundToInt(finalScore).ToString();
         }
-        else if (debugMode && isServer)
-        {
-            Debug.LogWarning("MothGameManager: finalScoreText is null");
-        }
 
         if (highScoreText != null)
         {
             highScoreText.text = Mathf.RoundToInt(highscore).ToString();
-        }
-        else if (debugMode && isServer)
-        {
-            Debug.LogWarning("MothGameManager: highScoreText is null");
         }
     }
 
@@ -358,6 +306,7 @@ public class MothGameManager : NetworkBehaviour
         totalMothsCaught = 0;
         totalMothsSpawned = 0;
         gameRunning = true;
+        isWaitingForRespawn = false;
         ClearActiveMoths();
         ChangeScore(0);
 
@@ -386,12 +335,11 @@ public class MothGameManager : NetworkBehaviour
             {
                 LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
                 LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_mode", timedMode ? "\"Timed\"" : "\"Untimed\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_difficulty", "\"" + difficulty.ToString("F1") + "\"");
             }
         }
         catch (Exception e)
         {
-            Debug.LogError("MothGameManager: Error starting logging: " + e.Message);
+            Debug.LogError("Error starting logging: " + e.Message);
         }
     }
 
@@ -399,11 +347,9 @@ public class MothGameManager : NetworkBehaviour
     {
         if (mothPrefab == null)
         {
-            Debug.LogError("MothGameManager: mothPrefab is not assigned!");
+            Debug.LogError("MothPrefab is not assigned!");
             return;
         }
-
-        if (debugMode) Debug.Log("MothGameManager: Spawning moth");
 
         try
         {
@@ -453,7 +399,7 @@ public class MothGameManager : NetworkBehaviour
             Moth mothComponent = moth.GetComponent<Moth>();
             if (mothComponent != null)
             {
-                mothComponent.Initialize(difficulty);
+                mothComponent.Initialize();
 
                 // Set the moth's zone properties
                 mothComponent.zoneCenter = zoneCenter;
@@ -461,36 +407,26 @@ public class MothGameManager : NetworkBehaviour
 
                 // Connect the caught event
                 mothComponent.OnMothCaught.AddListener(MothCaught);
-
-                if (debugMode) Debug.Log("MothGameManager: Moth component initialized");
             }
             else
             {
-                Debug.LogError("MothGameManager: Moth component not found on prefab!");
+                Debug.LogError("Moth component not found on prefab!");
             }
 
             // Spawn on network
             NetworkServer.Spawn(moth);
             activeMoths.Add(moth);
             totalMothsSpawned++;
-
-            if (debugMode) Debug.Log($"MothGameManager: Spawned moth at position {spawnPosition}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError("MothGameManager: Error spawning moth: " + e.Message + "\n" + e.StackTrace);
+            Debug.LogError("Error spawning moth: " + e.Message);
         }
     }
 
     public void MothCaught(Moth moth)
     {
-        if (!gameRunning)
-        {
-            if (debugMode) Debug.Log("MothGameManager: MothCaught called but game not running");
-            return;
-        }
-
-        if (debugMode) Debug.Log("MothGameManager: Moth caught!");
+        if (!gameRunning) return;
 
         // Add score
         score += scorePerMoth;
@@ -503,12 +439,12 @@ public class MothGameManager : NetworkBehaviour
         {
             if (AudioManager.Instance != null)
             {
-                AudioManager.Instance.PlaySFX("CoinPickup"); // Use existing sound for now
+                AudioManager.Instance.PlaySFX("CoinPickup");
             }
         }
         catch (Exception e)
         {
-            Debug.LogWarning("MothGameManager: Error playing sound: " + e.Message);
+            Debug.LogWarning("Error playing sound: " + e.Message);
         }
 
         // Record event
@@ -521,7 +457,7 @@ public class MothGameManager : NetworkBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogWarning("MothGameManager: Error recording event: " + e.Message);
+            Debug.LogWarning("Error recording event: " + e.Message);
         }
 
         // Remove from moth tracking list
@@ -531,13 +467,22 @@ public class MothGameManager : NetworkBehaviour
             activeMoths.Remove(mothObj);
         }
 
-        // Immediately destroy the caught moth
+        // Destroy the caught moth
         if (moth != null)
         {
             NetworkServer.Destroy(moth.gameObject);
         }
 
-        // No need to spawn a replacement - MaintainExactlyFourMoths() will handle this
+        // Use the respawn delay before allowing new moths to spawn
+        StartCoroutine(DelayRespawn());
+    }
+
+    private IEnumerator DelayRespawn()
+    {
+        isWaitingForRespawn = true;
+        yield return new WaitForSeconds(respawnDelay);
+        isWaitingForRespawn = false;
+        // MaintainExactlyFourMoths() will handle the spawning in the next Update
     }
 
     private void PlaySuccessEffects(Vector3 position)
@@ -552,12 +497,8 @@ public class MothGameManager : NetworkBehaviour
             }
             catch (Exception e)
             {
-                Debug.LogWarning("MothGameManager: Error playing success effect: " + e.Message);
+                Debug.LogWarning("Error playing success effect: " + e.Message);
             }
-        }
-        else if (debugMode)
-        {
-            Debug.LogWarning("MothGameManager: successEffect is null");
         }
     }
 
@@ -567,10 +508,6 @@ public class MothGameManager : NetworkBehaviour
         if (scoreText != null)
         {
             scoreText.text = newScore.ToString();
-        }
-        else if (debugMode && isServer)
-        {
-            Debug.LogWarning("MothGameManager: scoreText is null in ChangeScore");
         }
     }
 
@@ -585,36 +522,21 @@ public class MothGameManager : NetworkBehaviour
             string timeDisplay = $"{minutes:00}:{seconds:00}";
             timeText.text = timeDisplay;
         }
-        else if (debugMode && isServer)
-        {
-            Debug.LogWarning("MothGameManager: timeText is null in UpdateTimeDisplay");
-        }
     }
 
     public void ReturnToMenu()
     {
-        if (debugMode && isServer) Debug.Log("MothGameManager: Returning to menu");
         EndGame();
 
         if (menuManager != null)
         {
             menuManager.ReturnToGameMenu();
         }
-        else if (debugMode && isServer)
-        {
-            Debug.LogWarning("MothGameManager: menuManager is null in ReturnToMenu");
-        }
     }
 
     public void RestartGame()
     {
-        if (!isServer)
-        {
-            if (debugMode) Debug.Log("MothGameManager: RestartGame called but not server");
-            return;
-        }
-
-        if (debugMode) Debug.Log("MothGameManager: Restarting game");
+        if (!isServer) return;
 
         // Clean up current moths
         ClearActiveMoths();
@@ -635,27 +557,6 @@ public class MothGameManager : NetworkBehaviour
                 NetworkServer.Destroy(moth);
         }
         activeMoths.Clear();
-    }
-
-    // Allows changing difficulty dynamically
-    public void SetDifficulty(float difficultyLevel)
-    {
-        if (debugMode) Debug.Log($"MothGameManager: Setting difficulty to {difficultyLevel}");
-
-        difficulty = difficultyLevel;
-
-        // Update all active moths
-        foreach (var moth in activeMoths)
-        {
-            if (moth != null)
-            {
-                Moth mothComponent = moth.GetComponent<Moth>();
-                if (mothComponent != null)
-                {
-                    mothComponent.SetDifficulty(difficulty);
-                }
-            }
-        }
     }
 
     // Check if game is currently running
