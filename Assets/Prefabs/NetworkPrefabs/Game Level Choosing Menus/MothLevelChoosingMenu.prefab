@@ -1946,7 +1946,7 @@ MonoBehaviour:
   - {fileID: 3093340971583618290, guid: e30095452b9a6974e809866b375ba6d2, type: 3}
   - {fileID: 5650805428155763147, guid: 8ce35b9d1999b3f4d8cde75595918a23, type: 3}
   objectToHide: {fileID: 133802235369550865}
-  levelSpawningHeight: 0
+  levelSpawningHeight: -0.13
   levelSpawningDepth: 12.29
   currentlyPlayedLevel: {fileID: 0}
   hidableMobileUI: {fileID: 4029297264486485614}

@@ -1949,7 +1949,7 @@ GameObject:
   - component: {fileID: 974042384539549571}
   m_Layer: 3
   m_Name: NetworkRightHandPrefab 1
-  m_TagString: Untagged
+  m_TagString: Hands
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2027,6 +2027,7 @@ MonoBehaviour:
   syncInterval: 0
   skinnedMeshRenderer: {fileID: 857381332405187237}
   defaultBaseColor: {r: 1, g: 1, b: 1, a: 0.27450982}
+  disableColor: {r: 1, g: 0.5, b: 0, a: 0.1}
   selectedBaseColor: {r: 1, g: 0.7402892, b: 0, a: 0.27450982}
 --- !u!54 &161154376872227381
 Rigidbody:
@@ -2199,3 +2200,4 @@ MonoBehaviour:
   hittableLayer:
     serializedVersion: 2
     m_Bits: 128
+  positionOfLastInteraction: {x: 0, y: 0, z: 0}

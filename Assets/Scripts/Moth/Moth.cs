@@ -1,236 +1,160 @@
 using Mirror;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
 public class Moth : NetworkBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] private float baseMovementSpeed = 0.3f;
-    [SerializeField] private bool debugMode = true;
-    [SerializeField] private float minDistanceFromPlayer = 0.5f;
-    [SerializeField] private float maxDistanceFromPlayer = 1.5f;
+    [SerializeField] private float moveSpeed = 0.3f;
+    [SerializeField] private float changeDirectionTime = 3f;
+    [SerializeField] private bool debugMode = false;
 
-    [Header("Flying Area")]
-    [SerializeField] private float flyingHeight = 0.8f;  // Controls how high/low the moth can fly (0.8 = 0.4 up and 0.4 down)
-    [SerializeField] private float flyingWidth = 1.0f;   // Controls how far left/right the moth can fly (1.0 = 0.5 left and 0.5 right)
-
-    // Current movement parameters
-    private Vector3 targetPosition;
-    private float currentSpeed;
-    private float difficultyMultiplier = 1.0f;
-    private float nextTargetChangeTime;
-    private bool hasStartedMoving = false;
+    // Zone settings (will be set by MothGameManager)
+    [Header("Flying Zone")]
+    [HideInInspector] public Vector3 zoneCenter = new Vector3(0, 1.5f, 1f);
+    [HideInInspector] public Vector3 zoneSize = new Vector3(2f, 1f, 1f);
 
     // Events
     [HideInInspector] public UnityEvent<Moth> OnMothCaught = new UnityEvent<Moth>();
 
+    // Private variables
+    private Vector3 moveDirection;
+    private float nextChangeTime;
+    private bool isActive = true;
+
     public void Initialize(float difficulty)
     {
-        try
+        // Set random color
+        MeshRenderer renderer = GetComponent<MeshRenderer>();
+        if (renderer != null && renderer.material != null)
         {
-            difficultyMultiplier = difficulty;
-            currentSpeed = baseMovementSpeed * difficultyMultiplier;
-
-            // Force movement to start immediately
-            StartCoroutine(ForceStartMovement());
-
-            // Ensure the collider is properly set up
-            if (GetComponent<Collider>() == null)
-            {
-                SphereCollider collider = gameObject.AddComponent<SphereCollider>();
-                collider.isTrigger = true;
-                collider.radius = 0.3f;
-                if (debugMode) Debug.Log("Moth: Added collider");
-            }
-
-            if (debugMode) Debug.Log($"Moth: Initialized with difficulty {difficulty}, speed {currentSpeed}");
+            renderer.material.color = new Color(
+                UnityEngine.Random.Range(0.5f, 1.0f),
+                UnityEngine.Random.Range(0.5f, 1.0f),
+                UnityEngine.Random.Range(0.5f, 1.0f)
+            );
         }
-        catch (Exception e)
+
+        // Set speed based on difficulty
+        moveSpeed *= difficulty;
+
+        // Pick a random direction
+        PickNewDirection();
+
+        // Set next direction change time
+        nextChangeTime = Time.time + UnityEngine.Random.Range(changeDirectionTime * 0.5f, changeDirectionTime * 1.5f);
+
+        // Set up collider if needed
+        if (GetComponent<Collider>() == null)
         {
-            Debug.LogError("Moth: Error in Initialize: " + e.Message + "\n" + e.StackTrace);
+            SphereCollider collider = gameObject.AddComponent<SphereCollider>();
+            collider.isTrigger = true;
+            collider.radius = 0.3f;
         }
-    }
-
-    private IEnumerator ForceStartMovement()
-    {
-        // Wait a frame to ensure everything is set up
-        yield return null;
-
-        // Force a new target position
-        GetNewTargetPosition();
-
-        // Explicitly set that we've started moving
-        hasStartedMoving = true;
-
-        if (debugMode) Debug.Log("Moth: Forced movement start. Target: " + targetPosition);
     }
 
     private void Update()
     {
-        if (!isServer) return;
+        if (!isServer || !isActive) return;
 
-        try
+        // Change direction occasionally
+        if (Time.time > nextChangeTime)
         {
-            // Check if it's time to change target
-            if (Time.time > nextTargetChangeTime)
-            {
-                GetNewTargetPosition();
-            }
-
-            // If we don't have a target yet, get one
-            if (targetPosition == Vector3.zero || !hasStartedMoving)
-            {
-                GetNewTargetPosition();
-                hasStartedMoving = true;
-            }
-
-            // Move toward target position
-            if (targetPosition != Vector3.zero)
-            {
-                // Direction to target
-                Vector3 directionToTarget = (targetPosition - transform.position).normalized;
-
-                // Move the moth
-                float actualSpeed = currentSpeed; // Use member variable for consistency
-                Vector3 movement = directionToTarget * actualSpeed * Time.deltaTime;
-                transform.position += movement;
-
-                if (debugMode && Time.frameCount % 60 == 0)
-                {
-                    Debug.Log($"Moth: Moving at speed {actualSpeed}. Movement this frame: {movement.magnitude}");
-                }
-
-                // Look in the movement direction
-                transform.forward = directionToTarget;
-
-                // If we're close to target, pick a new target
-                if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
-                {
-                    if (debugMode) Debug.Log("Moth: Reached target, getting new target");
-                    GetNewTargetPosition();
-                }
-
-                // Add a little rotation for visual interest
-                transform.Rotate(0, Time.deltaTime * 90f, 0, Space.Self);
-            }
+            PickNewDirection();
+            nextChangeTime = Time.time + UnityEngine.Random.Range(changeDirectionTime * 0.5f, changeDirectionTime * 1.5f);
         }
-        catch (Exception e)
+
+        // Move in current direction
+        transform.position += moveDirection * moveSpeed * Time.deltaTime;
+
+        // Check boundaries and bounce if needed
+        CheckBoundaries();
+
+        // Make the moth face the direction it's moving
+        if (moveDirection != Vector3.zero)
         {
-            Debug.LogError("Moth: Error in Update: " + e.Message);
+            transform.forward = moveDirection;
         }
+
+        // Add some rotation for visual interest
+        transform.Rotate(0, Time.deltaTime * 90f, 0, Space.Self);
     }
 
-    private void GetNewTargetPosition()
+    private void PickNewDirection()
     {
-        try
-        {
-            // Get camera
-            Camera mainCamera = Camera.main;
-            if (mainCamera == null)
-            {
-                if (debugMode) Debug.LogWarning("Moth: Camera.main is null, using fallback position");
-                targetPosition = new Vector3(UnityEngine.Random.Range(-1f, 1f), 1.5f, 1f);
-                nextTargetChangeTime = Time.time + 3f;
-                return;
-            }
-
-            // Get camera position
-            Vector3 cameraPosition = mainCamera.transform.position;
-
-            // Fixed forward direction (slightly upward)
-            Vector3 fixedForward = Vector3.forward;
-            fixedForward.y = 0.4f; // Slight upward tilt
-            fixedForward.Normalize();
-
-            // Random distance in front of camera
-            float distance = UnityEngine.Random.Range(minDistanceFromPlayer, maxDistanceFromPlayer);
-
-            // Random vertical offset using flyingHeight
-            float yOffset = UnityEngine.Random.Range(-flyingHeight/2f, flyingHeight/2f);
-
-            // Random horizontal offset using flyingWidth
-            float xOffset = UnityEngine.Random.Range(-flyingWidth/2f, flyingWidth/2f);
-
-            // Calculate target position
-            targetPosition = cameraPosition + fixedForward * distance;
-            targetPosition.y += yOffset;
-            targetPosition.x += xOffset;
-
-            // Ensure minimum height
-            if (targetPosition.y < 0.5f)
-            {
-                targetPosition.y = 0.5f;
-            }
-
-            // Set time for next target change
-            nextTargetChangeTime = Time.time + UnityEngine.Random.Range(2f, 4f);
-
-            if (debugMode) Debug.Log($"Moth: New target position: {targetPosition}. Next change at: {nextTargetChangeTime}");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("Moth: Error in GetNewTargetPosition: " + e.Message);
-            // Use a safe fallback position
-            targetPosition = new Vector3(transform.position.x + 0.5f, 1.5f, transform.position.z + 0.5f);
-            nextTargetChangeTime = Time.time + 2f;
-        }
+        moveDirection = new Vector3(
+            UnityEngine.Random.Range(-1f, 1f),
+            UnityEngine.Random.Range(-1f, 1f),
+            UnityEngine.Random.Range(-1f, 1f)
+        ).normalized;
     }
 
-    public void Respawn()
+    private void CheckBoundaries()
     {
-        if (!isServer) return;
+        Vector3 halfSize = zoneSize * 0.5f;
+        bool needNewDirection = false;
 
-        try
+        // Check if we're outside the zone and bounce
+        if (transform.position.x < zoneCenter.x - halfSize.x || transform.position.x > zoneCenter.x + halfSize.x)
         {
-            if (debugMode) Debug.Log("Moth: Respawning");
-
-            // Get a new position
-            GetNewTargetPosition();
-
-            // Immediately move to a position halfway to the target to reset
-            Vector3 midPoint = Vector3.Lerp(Camera.main.transform.position, targetPosition, 0.5f);
-            transform.position = midPoint;
-
-            // Force immediate movement
-            hasStartedMoving = true;
+            moveDirection.x = -moveDirection.x;
+            needNewDirection = true;
         }
-        catch (Exception e)
+
+        if (transform.position.y < zoneCenter.y - halfSize.y || transform.position.y > zoneCenter.y + halfSize.y)
         {
-            Debug.LogError("Moth: Error in Respawn: " + e.Message);
+            moveDirection.y = -moveDirection.y;
+            needNewDirection = true;
+        }
+
+        if (transform.position.z < zoneCenter.z - halfSize.z || transform.position.z > zoneCenter.z + halfSize.z)
+        {
+            moveDirection.z = -moveDirection.z;
+            needNewDirection = true;
+        }
+
+        // Ensure we stay in boundaries
+        transform.position = new Vector3(
+            Mathf.Clamp(transform.position.x, zoneCenter.x - halfSize.x, zoneCenter.x + halfSize.x),
+            Mathf.Clamp(transform.position.y, zoneCenter.y - halfSize.y, zoneCenter.y + halfSize.y),
+            Mathf.Clamp(transform.position.z, zoneCenter.z - halfSize.z, zoneCenter.z + halfSize.z)
+        );
+
+        // Apply the new direction if we bounced
+        if (needNewDirection)
+        {
+            moveDirection.Normalize();
         }
     }
 
     public void SetDifficulty(float difficulty)
     {
-        try
-        {
-            difficultyMultiplier = difficulty;
-            currentSpeed = baseMovementSpeed * difficultyMultiplier;
-            if (debugMode) Debug.Log($"Moth: Difficulty set to {difficulty}, speed is now {currentSpeed}");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("Moth: Error in SetDifficulty: " + e.Message);
-        }
+        moveSpeed = 0.3f * difficulty; // Reset to base speed times difficulty
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!isServer) return;
+        if (!isServer || !isActive) return;
 
-        try
+        if (debugMode)
         {
-            if (debugMode) Debug.Log($"Moth: Triggered by {other.gameObject.name} with tag {other.tag}");
+            Debug.Log($"Moth: Collision with {other.gameObject.name}, layer: {LayerMask.LayerToName(other.gameObject.layer)}");
+        }
 
-            // Notify the game manager that the moth was caught
+        // Check for player hands
+        if (other.gameObject.layer == LayerMask.NameToLayer("PlayerHands"))
+        {
+            isActive = false;
             OnMothCaught.Invoke(this);
         }
-        catch (Exception e)
+        // Avoid other moths
+        else if (other.gameObject.layer == LayerMask.NameToLayer("Moth"))
         {
-            Debug.LogError("Moth: Error in OnTriggerEnter: " + e.Message);
+            // Move away from other moth
+            Vector3 awayDirection = (transform.position - other.transform.position).normalized;
+            transform.position += awayDirection * 0.1f;
+            moveDirection = awayDirection;
         }
     }
 }

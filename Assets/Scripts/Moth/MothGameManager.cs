@@ -25,8 +25,9 @@ public class MothGameManager : NetworkBehaviour
 
     [Header("Spawn Settings")]
     [SerializeField] private GameObject mothPrefab;
-    [SerializeField] private int maxActiveMoths = 1; // Usually just 1 at a time
-    [SerializeField] private Vector3 initialSpawnPosition = new Vector3(0, 1.5f, 1f); // Fallback spawn position
+    [SerializeField] private int maxActiveMoths = 4; // Always keep exactly 4 moths
+    [SerializeField] private Vector3 zoneCenter = new Vector3(0, 1.5f, 1f); // Center of moth flying zone
+    [SerializeField] private Vector3 zoneSize = new Vector3(2f, 1f, 1f); // Size of moth flying zone
 
     [Header("UI Elements")]
     [SerializeField] private GameObject initialButtons;
@@ -46,7 +47,6 @@ public class MothGameManager : NetworkBehaviour
     private int totalMothsCaught = 0;
     private int totalMothsSpawned = 0;
     private List<GameObject> activeMoths = new List<GameObject>();
-    private float nextSpawnTime = 0f;
 
     // Events
     public UnityEvent OnGameStart;
@@ -170,6 +170,9 @@ public class MothGameManager : NetworkBehaviour
             return;
         }
 
+        // Maintain exactly 4 moths at all times
+        MaintainExactlyFourMoths();
+
         if (timedMode)
         {
             // Update timer
@@ -186,94 +189,60 @@ public class MothGameManager : NetworkBehaviour
                 return;
             }
         }
+    }
 
-        // Ensure we have active moths
-        if (activeMoths.Count < maxActiveMoths && Time.time > nextSpawnTime)
-        {
-            if (debugMode) Debug.Log("MothGameManager: Spawning new moth from Update");
-            SpawnMoth();
-            nextSpawnTime = Time.time + 0.5f; // Prevent multiple spawns in same frame
-        }
+    // Function to maintain exactly 4 moths
+    private void MaintainExactlyFourMoths()
+    {
+        if (!isServer) return;
 
-        // Clean up any destroyed moths from the list
+        // Clean up any null references
         for (int i = activeMoths.Count - 1; i >= 0; i--)
         {
             if (activeMoths[i] == null)
             {
-                if (debugMode) Debug.Log("MothGameManager: Removing null moth from activeMoths list");
                 activeMoths.RemoveAt(i);
             }
         }
+
+        // Count how many moths are currently active
+        int currentMothCount = activeMoths.Count;
+
+        // If we have too many moths, remove extras
+        if (currentMothCount > 4)
+        {
+            for (int i = currentMothCount - 1; i >= 4; i--)
+            {
+                if (activeMoths[i] != null)
+                {
+                    NetworkServer.Destroy(activeMoths[i]);
+                    activeMoths.RemoveAt(i);
+                }
+            }
+        }
+
+        // If we need more moths, add them
+        if (currentMothCount < 4)
+        {
+            for (int i = 0; i < 4 - currentMothCount; i++)
+            {
+                SpawnMoth();
+            }
+        }
     }
 
-    public void StartGame()
+    private void OnDestroy()
     {
-        if (!isServer)
+        if (isServer)
         {
-            if (debugMode) Debug.Log("MothGameManager: StartGame called but not server");
-            return;
-        }
-
-        if (gameRunning)
-        {
-            if (debugMode) Debug.Log("MothGameManager: StartGame called but game already running");
-            return;
-        }
-
-        if (debugMode) Debug.Log("MothGameManager: Starting game");
-
-        // Reset game state
-        score = 0;
-        gameTimer = 0f;
-        totalMothsCaught = 0;
-        totalMothsSpawned = 0;
-        gameRunning = true;
-        ChangeScore(0);
-
-        // Clean up any existing moths
-        foreach (var moth in activeMoths)
-        {
-            if (moth != null)
+            // Clean up all active moths
+            foreach (var moth in activeMoths)
             {
-                if (debugMode) Debug.Log("MothGameManager: Destroying existing moth");
-                NetworkServer.Destroy(moth);
+                if (moth != null)
+                    NetworkServer.Destroy(moth);
             }
+            activeMoths.Clear();
         }
-        activeMoths.Clear();
-
-        // Hide end game UI if visible
-        DisplayEndGameInfo(false, 0, 0);
-
-        // Start logging
-        try
-        {
-            if (LoggerCommunicationProvider.Instance != null)
-            {
-                LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_mode", timedMode ? "\"Timed\"" : "\"Untimed\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_difficulty", "\"" + difficulty.ToString("F1") + "\"");
-            }
-            else if (debugMode)
-            {
-                Debug.LogWarning("MothGameManager: LoggerCommunicationProvider.Instance is null");
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("MothGameManager: Error starting logging: " + e.Message);
-        }
-
-        OnGameStart.Invoke();
-
-        // Spawn first moth with a slight delay to ensure everything is ready
-        StartCoroutine(DelayedFirstSpawn());
-    }
-
-    private IEnumerator DelayedFirstSpawn()
-    {
-        yield return new WaitForSeconds(0.5f);
-        if (debugMode) Debug.Log("MothGameManager: Spawning first moth after delay");
-        SpawnMoth();
     }
 
     [ClientRpc]
@@ -376,45 +345,124 @@ public class MothGameManager : NetworkBehaviour
         }
     }
 
+    [ClientRpc]
+    public void StartGame()
+    {
+        OnGameStart.Invoke();
+
+        if (!isServer || gameRunning) return;
+
+        // Reset game state
+        score = 0;
+        gameTimer = 0f;
+        totalMothsCaught = 0;
+        totalMothsSpawned = 0;
+        gameRunning = true;
+        ClearActiveMoths();
+        ChangeScore(0);
+
+        // Show timer if in timed mode
+        if (timedMode && timeText != null)
+        {
+            timeText.gameObject.SetActive(true);
+        }
+
+        // Spawn initial moths
+        for (int i = 0; i < maxActiveMoths; i++)
+        {
+            SpawnMoth();
+        }
+
+        // Play some audio
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("RobotReboot");
+        }
+
+        // Start logging
+        try
+        {
+            if (LoggerCommunicationProvider.Instance != null)
+            {
+                LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
+                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_mode", timedMode ? "\"Timed\"" : "\"Untimed\"");
+                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_difficulty", "\"" + difficulty.ToString("F1") + "\"");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("MothGameManager: Error starting logging: " + e.Message);
+        }
+    }
+
     private void SpawnMoth()
     {
-        if (!gameRunning)
-        {
-            Debug.Log("MothGameManager: SpawnMoth called but game not running");
-            return;
-        }
-
         if (mothPrefab == null)
         {
-            Debug.LogError("MothGameManager: Cannot spawn moth - mothPrefab is null!");
+            Debug.LogError("MothGameManager: mothPrefab is not assigned!");
             return;
         }
 
-        Debug.Log("MothGameManager: Spawning moth");
+        if (debugMode) Debug.Log("MothGameManager: Spawning moth");
 
         try
         {
-            // Use a fixed position in front of the player for reliable spawning
-            Vector3 spawnPosition = new Vector3(0, 1.5f, 1f);
+            // Get a random position in the spawn zone
+            Vector3 halfSize = zoneSize * 0.5f;
+            Vector3 spawnPosition = new Vector3(
+                UnityEngine.Random.Range(zoneCenter.x - halfSize.x, zoneCenter.x + halfSize.x),
+                UnityEngine.Random.Range(zoneCenter.y - halfSize.y, zoneCenter.y + halfSize.y),
+                UnityEngine.Random.Range(zoneCenter.z - halfSize.z, zoneCenter.z + halfSize.z)
+            );
 
-            // If camera is available, position relative to it
-            if (Camera.main != null)
+            // Try to avoid overlapping with other moths
+            for (int attempt = 0; attempt < 5; attempt++)
             {
-                // Position moth 1.5 meters in front of the camera, at eye level
-                spawnPosition = Camera.main.transform.position + Camera.main.transform.forward * 1.5f;
-                spawnPosition.y = Camera.main.transform.position.y; // Keep at eye level
+                bool validPosition = true;
+
+                // Check distance from other moths
+                foreach (var otherMoth in activeMoths)
+                {
+                    if (otherMoth == null) continue;
+
+                    float distance = Vector3.Distance(spawnPosition, otherMoth.transform.position);
+                    if (distance < 0.5f) // Minimum separation
+                    {
+                        validPosition = false;
+                        break;
+                    }
+                }
+
+                if (validPosition)
+                {
+                    break;
+                }
+
+                // Try another position
+                spawnPosition = new Vector3(
+                    UnityEngine.Random.Range(zoneCenter.x - halfSize.x, zoneCenter.x + halfSize.x),
+                    UnityEngine.Random.Range(zoneCenter.y - halfSize.y, zoneCenter.y + halfSize.y),
+                    UnityEngine.Random.Range(zoneCenter.z - halfSize.z, zoneCenter.z + halfSize.z)
+                );
             }
 
             // Create moth
             GameObject moth = Instantiate(mothPrefab, spawnPosition, Quaternion.identity);
 
-            // Configure moth behavior
+            // Set the moth's zone properties to match game manager's zone
             Moth mothComponent = moth.GetComponent<Moth>();
             if (mothComponent != null)
             {
                 mothComponent.Initialize(difficulty);
+
+                // Set the moth's zone properties
+                mothComponent.zoneCenter = zoneCenter;
+                mothComponent.zoneSize = zoneSize;
+
+                // Connect the caught event
                 mothComponent.OnMothCaught.AddListener(MothCaught);
-                Debug.Log("MothGameManager: Moth component initialized");
+
+                if (debugMode) Debug.Log("MothGameManager: Moth component initialized");
             }
             else
             {
@@ -424,10 +472,9 @@ public class MothGameManager : NetworkBehaviour
             // Spawn on network
             NetworkServer.Spawn(moth);
             activeMoths.Add(moth);
-
             totalMothsSpawned++;
 
-            Debug.Log("MothGameManager: Spawned moth #" + totalMothsSpawned + " at position " + spawnPosition);
+            if (debugMode) Debug.Log($"MothGameManager: Spawned moth at position {spawnPosition}");
         }
         catch (System.Exception e)
         {
@@ -477,34 +524,20 @@ public class MothGameManager : NetworkBehaviour
             Debug.LogWarning("MothGameManager: Error recording event: " + e.Message);
         }
 
+        // Remove from moth tracking list
+        GameObject mothObj = moth.gameObject;
+        if (activeMoths.Contains(mothObj))
+        {
+            activeMoths.Remove(mothObj);
+        }
+
         // Immediately destroy the caught moth
         if (moth != null)
         {
             NetworkServer.Destroy(moth.gameObject);
-            activeMoths.Remove(moth.gameObject);
         }
 
-        // Spawn new moth after delay
-        StartCoroutine(SpawnNewMothAfterDelay());
-    }
-
-    private IEnumerator SpawnNewMothAfterDelay()
-    {
-        if (debugMode) Debug.Log("MothGameManager: Starting spawn delay");
-
-        // Wait before spawning new moth
-        yield return new WaitForSeconds(respawnDelay);
-
-        // Spawn if game still running
-        if (gameRunning)
-        {
-            if (debugMode) Debug.Log("MothGameManager: Spawning new moth");
-            SpawnMoth();
-        }
-        else
-        {
-            if (debugMode) Debug.Log("MothGameManager: Game not running, skipping spawn");
-        }
+        // No need to spawn a replacement - MaintainExactlyFourMoths() will handle this
     }
 
     private void PlaySuccessEffects(Vector3 position)
@@ -584,18 +617,24 @@ public class MothGameManager : NetworkBehaviour
         if (debugMode) Debug.Log("MothGameManager: Restarting game");
 
         // Clean up current moths
-        foreach (var moth in activeMoths)
-        {
-            if (moth != null)
-                NetworkServer.Destroy(moth);
-        }
-        activeMoths.Clear();
+        ClearActiveMoths();
 
         // Hide end game UI
         DisplayEndGameInfo(false, 0, 0);
 
         // Start fresh game
         StartGame();
+    }
+
+    // Clean up all active moths
+    private void ClearActiveMoths()
+    {
+        foreach (var moth in activeMoths)
+        {
+            if (moth != null)
+                NetworkServer.Destroy(moth);
+        }
+        activeMoths.Clear();
     }
 
     // Allows changing difficulty dynamically
@@ -619,31 +658,9 @@ public class MothGameManager : NetworkBehaviour
         }
     }
 
-    private void OnDestroy()
+    // Check if game is currently running
+    public bool IsGameRunning()
     {
-        if (isServer)
-        {
-            if (debugMode) Debug.Log("MothGameManager: OnDestroy");
-
-            // Clean up active moths
-            foreach (var moth in activeMoths)
-            {
-                if (moth != null)
-                    NetworkServer.Destroy(moth);
-            }
-
-            // Stop logging if necessary
-            try
-            {
-                if (LoggerCommunicationProvider.Instance != null && LoggerCommunicationProvider.Instance.loggingStarted)
-                {
-                    LoggerCommunicationProvider.Instance.StopLogging();
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("MothGameManager: Error stopping logging: " + e.Message);
-            }
-        }
+        return gameRunning;
     }
 }

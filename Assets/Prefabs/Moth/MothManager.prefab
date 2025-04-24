@@ -466,19 +466,20 @@ MonoBehaviour:
   gameDuration: 60
   respawnDelay: 1
   scorePerMoth: 1
-  difficulty: 1
+  difficulty: 5
   timedMode: 1
   debugMode: 1
   mothPrefab: {fileID: 5650805428155763147, guid: 8ce35b9d1999b3f4d8cde75595918a23, type: 3}
-  maxActiveMoths: 0
-  initialSpawnPosition: {x: 0, y: 2.079, z: 0}
+  maxActiveMoths: 4
+  zoneCenter: {x: 0, y: 2.2, z: 0.43}
+  zoneSize: {x: 0.8, y: 0.5, z: 0.4}
   initialButtons: {fileID: 2566665300545572651}
   inGameButton: {fileID: 8459340216251620434}
   endgameInfo: {fileID: 5881575536552786249}
   scoreText: {fileID: 2783230211383033144}
   timeText: {fileID: 3702785781749145556}
-  finalScoreText: {fileID: 5892450525248409138}
-  highScoreText: {fileID: 3635609262359405766}
+  finalScoreText: {fileID: 4499558253332574733}
+  highScoreText: {fileID: 7037428679258922479}
   successEffect: {fileID: 0}
   OnGameStart:
     m_PersistentCalls:
@@ -1066,7 +1067,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4525732521493026151, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -0.406
       objectReference: {fileID: 0}
     - target: {fileID: 4525732521493026151, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: m_LocalPosition.y
@@ -1698,9 +1699,9 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5378923480467196058, guid: 05877103b5c71ec49b016e23da1df9dd, type: 3}
   m_PrefabInstance: {fileID: 8046824658911633265}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &3635609262359405766 stripped
+--- !u!114 &4499558253332574733 stripped
 MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6762250738883460023, guid: 05877103b5c71ec49b016e23da1df9dd, type: 3}
+  m_CorrespondingSourceObject: {fileID: 5899069003251887484, guid: 05877103b5c71ec49b016e23da1df9dd, type: 3}
   m_PrefabInstance: {fileID: 8046824658911633265}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
@@ -1714,9 +1715,9 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 4482099422323484216, guid: 05877103b5c71ec49b016e23da1df9dd, type: 3}
   m_PrefabInstance: {fileID: 8046824658911633265}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &5892450525248409138 stripped
+--- !u!114 &7037428679258922479 stripped
 MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4497443379251433795, guid: 05877103b5c71ec49b016e23da1df9dd, type: 3}
+  m_CorrespondingSourceObject: {fileID: 1010469318121996958, guid: 05877103b5c71ec49b016e23da1df9dd, type: 3}
   m_PrefabInstance: {fileID: 8046824658911633265}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
