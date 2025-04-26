@@ -1,5 +1,6 @@
 using UnityEngine;
 using Mirror;
+using System.Collections;
 
 public class Obstacle_NewGame : NetworkBehaviour
 {
@@ -14,6 +15,9 @@ public class Obstacle_NewGame : NetworkBehaviour
     [SerializeField] private bool rotateX = true;
     [SerializeField] private bool rotateY = true;
     [SerializeField] private bool rotateZ = true;
+
+    [Header("Visual Effects")]
+    [SerializeField] private GameObject balloonPopEffect; // Assign in inspector
 
     // For straight falling movement
     private Vector3 startPosition;
@@ -84,17 +88,75 @@ public class Obstacle_NewGame : NetworkBehaviour
             // Disable the collider immediately to prevent jittering
             GetComponent<Collider>().enabled = false;
 
+            // Get the character/balloon reference
+            Character_NewGame character = collision.gameObject.GetComponent<Character_NewGame>();
+            if (character != null)
+            {
+                // Get the center position of the balloon for the effect
+                // This is better than using the collision point which might be at the edge
+                Vector3 balloonCenter = character.transform.position;
+
+                // If balloonPopEffect is a NetworkVisualEffect prefab, use it directly
+                if (balloonPopEffect != null && balloonPopEffect.TryGetComponent<NetworkVisualEffect>(out var _))
+                {
+                    // Spawn the effect at the center of the balloon
+                    NetworkVisualEffect vfx = Instantiate(balloonPopEffect, balloonCenter, Quaternion.identity)
+                        .GetComponent<NetworkVisualEffect>();
+
+                    NetworkServer.Spawn(vfx.gameObject);
+                    vfx.Play();
+
+                    Debug.Log($"Spawned balloon pop effect at balloon center: {balloonCenter}");
+                }
+
+                // Hide all renderers on the balloon
+                HideBalloon(character.gameObject);
+            }
+            else
+            {
+                Debug.LogError("Could not find Character_NewGame component on collided object!");
+            }
+
             // Play balloon pop sound
             if (AudioManager.Instance != null)
             {
                 AudioManager.Instance.PlaySFX("BalloonPop");
             }
 
-            // End the game via NewGameManager
+            // End the game via NewGameManager - with a small delay to let particle effect play
             if (NewGameManager.Instance != null)
             {
-                NewGameManager.Instance.EndGame();
+                StartCoroutine(DelayedGameEnd(0.2f));
             }
+        }
+    }
+
+    // Helper to hide balloon renderers
+    private void HideBalloon(GameObject balloon)
+    {
+        // Hide all renderers in the balloon and its children
+        Renderer[] renderers = balloon.GetComponentsInChildren<Renderer>();
+        foreach (Renderer renderer in renderers)
+        {
+            renderer.enabled = false;
+        }
+    }
+
+    private IEnumerator DelayedGameEnd(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (NewGameManager.Instance != null)
+        {
+            NewGameManager.Instance.EndGame();
+        }
+    }
+
+    private IEnumerator DestroyAfterDelay(GameObject obj, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (obj != null && isServer)
+        {
+            NetworkServer.Destroy(obj);
         }
     }
 }

@@ -391,7 +391,7 @@ MonoBehaviour:
   syncInterval: 0
   calibrationInstructionClip: {fileID: 8300000, guid: 652f4a4b22d89fa4ba3111bcdffe2e39, type: 3}
   rulesObstaclesClip: {fileID: 8300000, guid: f7ad4f6b952c2534583ea254c387f71e, type: 3}
-  rulesCollectClip: {fileID: 8300000, guid: c4de39e59435f564b80660616b8c6052, type: 3}
+  rulesCollectClip: {fileID: 8300000, guid: 17a2c30fdee62bc41b3b5713c9568c0c, type: 3}
   calibrationReminderDelay: 6
   minCalibrationDelay: 9
   rulesStartDelay: 9
@@ -545,7 +545,6 @@ MonoBehaviour:
   maxX: 5
   wallBuffer: 0.5
   obstacleFallSpeed: 3
-  collectibleFallSpeed: 2
   playerMovementSpeed: 5
   adaptiveSpawner: {fileID: 5771136485274600133}
   useAdaptiveSpawning: 1
@@ -557,6 +556,7 @@ MonoBehaviour:
   obstacleSpawnInterval: 4
   collectibleSpawnInterval: 5
   objectSpawnY: 10
+  isFirstPlay: 1
   initialButtons: {fileID: 2566665300545572651}
   inGameBackButton: {fileID: 8459340216251620434}
   endgameInfo: {fileID: 5881575536552786249}
@@ -566,6 +566,9 @@ MonoBehaviour:
   isCollectionMode: 0
   gameTimeLimit: 60
   waitAfterDeath: 1
+  initialCollectibleFallSpeed: 1.2
+  maxCollectibleFallSpeed: 9
+  speedIncreaseRate: 0.05
   character: {fileID: 7631030326713354399}
   scoreText: {fileID: 2783230211383033144}
   timeText: {fileID: 3702785781749145556}
@@ -823,7 +826,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &6161978798754942506
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1546,7 +1549,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4525732521493026151, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -0.297
       objectReference: {fileID: 0}
     - target: {fileID: 4525732521493026151, guid: 87bf7d49b75481e4bbbbb5cb0f488f01, type: 3}
       propertyPath: m_LocalPosition.y

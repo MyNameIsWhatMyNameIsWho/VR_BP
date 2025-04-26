@@ -52,8 +52,11 @@ public class GameAudioTutorial : NetworkBehaviour
 
     public void OnGameModeSelected(bool isCollectionMode)
     {
+        // Get reference to NewGameManager to check if first play
+        bool isReturnPlayer = gameManager != null && !gameManager.IsFirstPlay();
+
         ResetGameState();
-        StartGameSequence(isCollectionMode);
+        StartGameSequence(isCollectionMode, isReturnPlayer);
     }
 
     private void ResetGameState()
@@ -63,10 +66,22 @@ public class GameAudioTutorial : NetworkBehaviour
         StopAllCoroutines();
     }
 
-    private void StartGameSequence(bool isCollectionMode)
+    private void StartGameSequence(bool isCollectionMode, bool isReturnPlayer)
     {
         PlayCalibrationInstructions();
-        StartCoroutine(EnableCalibrationAfterDelay());
+
+        if (isReturnPlayer)
+        {
+            // Enable calibration immediately for return players
+            canCalibrate = true;
+            Debug.Log("Return player - calibration enabled immediately");
+        }
+        else
+        {
+            // First-time players wait for the delay
+            StartCoroutine(EnableCalibrationAfterDelay());
+        }
+
         reminderCoroutine = StartCoroutine(CalibrationReminderRoutine());
     }
 
@@ -74,7 +89,45 @@ public class GameAudioTutorial : NetworkBehaviour
     {
         calibrationComplete = true;
         StopReminderCoroutine();
-        StartCoroutine(PlayRulesThenStartGame(isCollectionMode));
+
+        // Always play rules track
+        PlayGameRules(isCollectionMode);
+
+        // Check if this is a return player
+        bool isReturnPlayer = gameManager != null && !gameManager.IsFirstPlay();
+
+        if (isReturnPlayer)
+        {
+            // For return players, start the game immediately
+            // but let the rules audio continue playing in the background
+            Debug.Log("Return player - starting game immediately while rules play in background");
+
+            // Start character movement immediately
+            StartCharacterMovement();
+
+            // Start spawning immediately too
+            StartObjectSpawning();
+        }
+        else
+        {
+            // First-time players still wait for rules to finish
+            StartCoroutine(WaitForRulesThenStartGame(isCollectionMode));
+        }
+    }
+
+    // New method for first-time players to wait for rules
+    private IEnumerator WaitForRulesThenStartGame(bool isCollectionMode)
+    {
+        Debug.Log("First-time player - waiting for rules to finish before starting game");
+
+        // Start the character movement right away
+        StartCharacterMovement();
+
+        // Wait for the rules delay before spawning objects
+        yield return new WaitForSeconds(rulesStartDelay);
+
+        // Start spawning after the delay
+        StartObjectSpawning();
     }
 
     private void StopReminderCoroutine()
@@ -111,21 +164,12 @@ public class GameAudioTutorial : NetworkBehaviour
         while (!calibrationComplete)
         {
             yield return new WaitForSeconds(calibrationReminderDelay);
-            
+
             if (!calibrationComplete && !audioSource.isPlaying)
             {
                 PlayCalibrationInstructions();
             }
         }
-    }
-
-    private IEnumerator PlayRulesThenStartGame(bool isCollectionMode)
-    {
-        yield return new WaitForSeconds(0.5f);
-        PlayGameRules(isCollectionMode);
-        StartCharacterMovement();
-        yield return new WaitForSeconds(rulesStartDelay);
-        StartObjectSpawning();
     }
 
     private void StartCharacterMovement()

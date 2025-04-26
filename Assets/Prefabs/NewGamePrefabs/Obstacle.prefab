@@ -118,7 +118,10 @@ MonoBehaviour:
   syncInterval: 0
   enableRotation: 1
   rotationSpeed: 30
-  rotationAxis: {x: 1, y: 1, z: 1}
+  rotateX: 1
+  rotateY: 1
+  rotateZ: 1
+  balloonPopEffect: {fileID: 5847549093853223384, guid: 2f18105726114014f8d525aae6329d7e, type: 3}
 --- !u!1001 &7973183333072588144
 PrefabInstance:
   m_ObjectHideFlags: 0

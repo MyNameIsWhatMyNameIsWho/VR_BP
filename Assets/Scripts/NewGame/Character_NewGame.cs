@@ -35,10 +35,10 @@ public class Character_NewGame : NetworkBehaviour
     private float targetSpeed = 0f;
     private float lastHandX = 0f;
     private float handOffset = 0f;
-    
+
     // Debugging
     private int frameCount = 0;
-    
+
     // Center position (exact middle)
     private Vector3 centerPosition;
 
@@ -51,24 +51,24 @@ public class Character_NewGame : NetworkBehaviour
         fixedY = fixedY != 0 ? fixedY : transform.position.y;
         fixedZ = fixedZ != 0 ? fixedZ : transform.position.z;
         centerPosition = new Vector3((minX + maxX) / 2f, fixedY, fixedZ);
-        
+
         // Get rigidbody if there is one
         rb = GetComponent<Rigidbody>();
-        
+
         // Force initial position
         ForceResetPosition();
     }
-    
+
     // Helper method to completely reset the balloon position and physics
     private void ForceResetPosition()
     {
         // Reset position to exact center
         transform.position = centerPosition;
-        
+
         // Reset rotation
         transform.rotation = Quaternion.identity;
         currentTiltAngle = 0f;
-        
+
         // Reset any physics forces if there's a rigidbody
         if (rb != null)
         {
@@ -88,7 +88,7 @@ public class Character_NewGame : NetworkBehaviour
             correctedPosition.z = fixedZ;
             transform.position = correctedPosition;
         }
-        
+
         if (!canMove) return;
 
         // Debugging log counter
@@ -195,10 +195,10 @@ public class Character_NewGame : NetworkBehaviour
     public void StartMovement()
     {
         Debug.Log("Starting movement");
-        
+
         // Force reset position and physics first
         ForceResetPosition();
-        
+
         // Then enable movement
         canMove = true;
         isInitialized = false;
@@ -230,10 +230,17 @@ public class Character_NewGame : NetworkBehaviour
     public void Spawn()
     {
         Debug.Log("Spawning balloon");
-        
+
         // Force complete reset of position and physics
         ForceResetPosition();
-        
+
+        // Re-enable all renderers that might have been disabled
+        Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
+        foreach (Renderer renderer in allRenderers)
+        {
+            renderer.enabled = true;
+        }
+
         canMove = false;
         isInitialized = false;
         currentSpeed = 0f;

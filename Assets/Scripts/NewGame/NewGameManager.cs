@@ -20,7 +20,7 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private float maxX = 5f;   // Right boundary for the cube
     [SerializeField] private float wallBuffer = 0.5f; // Buffer distance from wall to prevent objects spawning in walls
     [SerializeField] private float obstacleFallSpeed = 0.8f;
-    [SerializeField] private float collectibleFallSpeed = 1.2f;
+    //[SerializeField] private float collectibleFallSpeed = 1.2f;
     [SerializeField] private float playerMovementSpeed = 1.0f; // Base player movement speed
 
     [Header("Adaptive Spawning")]
@@ -36,10 +36,11 @@ public class NewGameManager : NetworkBehaviour
 
     // Store the difficulty level for logging
     private string currentDifficultyLevel = "Medium"; // Default value
+    private static bool hasPlayedAnyGame = false;
 
     // Public getters so other scripts can access but not modify these values
     public float ObstacleFallSpeed => obstacleFallSpeed;
-    public float CollectibleFallSpeed => collectibleFallSpeed;
+    public float CollectibleFallSpeed => currentCollectibleFallSpeed;
     public float GetMinX() { return minX; }
     public float GetMaxX() { return maxX; }
     public float GetWallBuffer() { return wallBuffer; }
@@ -49,6 +50,14 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private float obstacleSpawnInterval = 4f;
     [SerializeField] private float collectibleSpawnInterval = 2f;
     [SerializeField] private float objectSpawnY = 10f;
+
+    [Header("Tutorial Settings")]
+    [SerializeField] private bool isFirstPlay = true; // Track if this is first play
+    public bool IsFirstPlay()
+    {
+        // Return true only if this is literally the very first play
+        return !hasPlayedAnyGame;
+    }
 
     [Header("UI Elements")]
     [SerializeField] private GameObject initialButtons;
@@ -63,6 +72,12 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private bool isCollectionMode = false;
     [SerializeField] private float gameTimeLimit = 60f;
     [SerializeField] private float waitAfterDeath = 2f;
+
+    [Header("Collection Mode Settings")]
+    [SerializeField] private float initialCollectibleFallSpeed = 1.2f; // Starting fall speed
+    [SerializeField] private float maxCollectibleFallSpeed = 2.5f;     // Maximum fall speed
+    [SerializeField] private float speedIncreaseRate = 0.02f;          // Speed increase per second
+    private float currentCollectibleFallSpeed;                         // Current speed
 
     [Header("References")]
     [SerializeField] private Character_NewGame character;
@@ -130,6 +145,9 @@ public class NewGameManager : NetworkBehaviour
     private void Start()
     {
         menuManager = FindFirstObjectByType<GameMenuManager>();
+
+        // Initialize the current collectible fall speed
+        currentCollectibleFallSpeed = initialCollectibleFallSpeed;
 
         // Hide time text at start
         if (timeText != null)
@@ -295,11 +313,11 @@ public class NewGameManager : NetworkBehaviour
         // IMPORTANT: Now we're starting spawning, so enable timer and scoring
         spawningStarted = true;
 
-        // Show timer if in collection mode
-        if (isCollectionMode && timeText != null)
-        {
-            timeText.gameObject.SetActive(true);
-        }
+        //// Show timer if in collection mode
+        //if (isCollectionMode && timeText != null)
+        //{
+        //    timeText.gameObject.SetActive(true);
+        //}
 
         // Start the appropriate spawning coroutine
         if (spawnCoroutine != null)
@@ -389,10 +407,28 @@ public class NewGameManager : NetworkBehaviour
 
         if (isCollectionMode)
         {
-            // Update timer for collection mode
+            // Update timer for collection mode (just for tracking, no limit)
             gameTimer += Time.deltaTime;
 
-            // Check if time limit reached
+            // Gradually increase difficulty over time
+            currentCollectibleFallSpeed = Mathf.Min(
+                currentCollectibleFallSpeed + (speedIncreaseRate * Time.deltaTime),
+                maxCollectibleFallSpeed
+            );
+
+            // Update UI with current score
+            if (scoreText != null)
+            {
+                scoreText.text = $"{Mathf.RoundToInt(score)}";
+            }
+        }
+        else
+        {
+            // In obstacle mode, score increases over time
+            score += movementSpeed * Time.deltaTime;
+            ChangeScore(Mathf.RoundToInt(score));
+
+            // Check if time limit reached in timed mode
             if (gameTimer >= gameTimeLimit)
             {
                 EndGame();
@@ -401,12 +437,6 @@ public class NewGameManager : NetworkBehaviour
 
             // Update UI with remaining time
             UpdateTimeDisplay(gameTimeLimit - gameTimer);
-        }
-        else
-        {
-            // In obstacle mode, score increases over time
-            score += movementSpeed * Time.deltaTime;
-            ChangeScore(Mathf.RoundToInt(score));
         }
     }
 
@@ -575,6 +605,9 @@ public class NewGameManager : NetworkBehaviour
 
         if (!isServer || gameRunning) return;
 
+        // Set hasPlayedAnyGame to true as soon as any game starts
+        hasPlayedAnyGame = true;
+
         // Reset game state
         gameRunning = false; // We'll set this to true after calibration/tutorial
         gameEnding = false;
@@ -584,6 +617,9 @@ public class NewGameManager : NetworkBehaviour
         score = 0;
         gameTimer = 0f;
         ChangeScore(0);
+
+        // Reset collectible fall speed to initial value
+        currentCollectibleFallSpeed = initialCollectibleFallSpeed;
 
         // Set time text visibility based on game mode
         if (timeText != null)
@@ -775,6 +811,8 @@ public class NewGameManager : NetworkBehaviour
             Collectible collectible = obj.GetComponent<Collectible>();
             if (collectible != null)
             {
+                // Set fall speed before initializing
+                collectible.SetFallSpeed(currentCollectibleFallSpeed);
                 collectible.Initialize();
             }
         }
@@ -868,6 +906,7 @@ public class NewGameManager : NetworkBehaviour
         Collectible collectible = obj.GetComponent<Collectible>();
         if (collectible != null)
         {
+            collectible.SetFallSpeed(currentCollectibleFallSpeed);
             collectible.Initialize();
         }
 
@@ -970,6 +1009,10 @@ public class NewGameManager : NetworkBehaviour
 
         Debug.Log("RestartGame called");
 
+        // Set isFirstPlay to false since this is a restart
+        isFirstPlay = false;
+        hasPlayedAnyGame = true;
+
         // Reset adaptive spawner tracking
         if (adaptiveSpawner != null)
         {
@@ -998,6 +1041,7 @@ public class NewGameManager : NetworkBehaviour
         spawningStarted = false;    // Reset spawning started flag
         score = 0f;
         gameTimer = 0f;
+        currentCollectibleFallSpeed = initialCollectibleFallSpeed; // Reset fall speed
         ChangeScore(0);
 
         // Hide timer

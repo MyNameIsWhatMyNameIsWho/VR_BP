@@ -1,9 +1,12 @@
 using UnityEngine;
 using Mirror;
+using System.Collections;
 
 public class Collectible : NetworkBehaviour
 {
     [SerializeField] private int pointValue = 10;
+
+    [Header("Visual Effects")]
     [SerializeField] private GameObject collectionEffect;
 
     [Header("Rotation Settings")]
@@ -20,14 +23,26 @@ public class Collectible : NetworkBehaviour
     private Vector3 startPosition;
     private float currentY;
 
+    // Method for NewGameManager to set the fall speed
+    public void SetFallSpeed(float newSpeed)
+    {
+        fallSpeed = newSpeed;
+    }
+
+    // Get current fall speed
+    public float GetFallSpeed()
+    {
+        return fallSpeed;
+    }
+
     public void Initialize()
     {
         // Get the speed from the central manager
-        if (NewGameManager.Instance != null)
+        if (fallSpeed <= 0 && NewGameManager.Instance != null)
         {
             fallSpeed = NewGameManager.Instance.CollectibleFallSpeed;
         }
-        else
+        else if (fallSpeed <= 0)
         {
             fallSpeed = 1.2f; // Fallback default
             Debug.LogError("NewGameManager.Instance is null in Collectible Initialize!");
@@ -73,11 +88,20 @@ public class Collectible : NetworkBehaviour
             // Mark as collected to prevent duplicate collection
             isCollected = true;
 
-            // Play collection effect if available
-            if (collectionEffect != null)
+            // Get exact position for the effect
+            Vector3 effectPosition = transform.position;
+
+            // If collectionEffect is a NetworkVisualEffect prefab, use it directly
+            if (collectionEffect != null && collectionEffect.TryGetComponent<NetworkVisualEffect>(out var _))
             {
-                GameObject effect = Instantiate(collectionEffect, transform.position, Quaternion.identity);
-                NetworkServer.Spawn(effect);
+                // Spawn the effect at the collectible position
+                NetworkVisualEffect vfx = Instantiate(collectionEffect, effectPosition, Quaternion.identity)
+                    .GetComponent<NetworkVisualEffect>();
+
+                NetworkServer.Spawn(vfx.gameObject);
+                vfx.Play();
+
+                Debug.Log($"Spawned collection effect at position: {effectPosition}");
             }
 
             // Notify the adaptive spawner this was collected
@@ -96,10 +120,17 @@ public class Collectible : NetworkBehaviour
             // Disable the collider to prevent multiple collections
             GetComponent<Collider>().enabled = false;
 
-            // COMMENTED OUT: GetComponent<Renderer>().enabled = false;
-
             // Immediately destroy the collectible
             NetworkServer.Destroy(gameObject);
+        }
+    }
+
+    private IEnumerator DestroyAfterDelay(GameObject obj, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (obj != null && isServer)
+        {
+            NetworkServer.Destroy(obj);
         }
     }
 
