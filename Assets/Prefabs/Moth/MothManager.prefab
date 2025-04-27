@@ -470,7 +470,7 @@ MonoBehaviour:
   timedMode: 1
   mothPrefab: {fileID: 5650805428155763147, guid: 8ce35b9d1999b3f4d8cde75595918a23, type: 3}
   maxActiveMoths: 4
-  zoneCenter: {x: 0, y: 2.2, z: 0.43}
+  zoneCenter: {x: 0, y: 2.2, z: 0.4}
   zoneSize: {x: 0.8, y: 0.5, z: 0.4}
   initialButtons: {fileID: 2566665300545572651}
   inGameButton: {fileID: 8459340216251620434}
@@ -505,11 +505,10 @@ MonoBehaviour:
   - {r: 0.3, g: 0.8, b: 0.3, a: 1}
   - {r: 0.3, g: 0.3, b: 1, a: 1}
   - {r: 1, g: 1, b: 0.3, a: 1}
-  minTimeBetweenCatches: 0.5
   minComboLength: 2
-  baseTimeReward: 1
+  baseTimeReward: 0
   additionalTimePerCombo: 2
-  pointsPerCombo: 5
+  pointsPerCombo: 10
   showDebugMessages: 1
 --- !u!114 &-4041341254498549845
 MonoBehaviour:

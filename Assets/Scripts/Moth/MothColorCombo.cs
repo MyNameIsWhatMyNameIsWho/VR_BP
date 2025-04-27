@@ -2,8 +2,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Manages color combo tracking and rewards for the moth game
-/// Only rewards clearly intentional color combos
+/// Simple color combo system for moth game
 /// </summary>
 public class MothColorCombo : MonoBehaviour
 {
@@ -17,8 +16,7 @@ public class MothColorCombo : MonoBehaviour
         new Color(0.8f, 0.3f, 0.8f)   // Purple
     };
 
-    [Header("Intentional Combo Settings")]
-    [SerializeField] private float minTimeBetweenCatches = 1.0f;   // Minimum time between catches to be considered intentional
+    [Header("Combo Settings")]
     [SerializeField] private int minComboLength = 2;               // Minimum combo length to get any reward
     [SerializeField] private float baseTimeReward = 3.0f;          // Base time reward for minimum combo
     [SerializeField] private float additionalTimePerCombo = 2.0f;  // Additional time per extra moth in combo
@@ -28,10 +26,7 @@ public class MothColorCombo : MonoBehaviour
     // Combo tracking
     private Color currentComboColor;
     private int comboCount = 0;
-    private float pendingTimeReward = 0f;
     private bool isComboActive = false;
-    private float lastCatchTime = 0f;
-    private bool lastCatchWasTooFast = false;
 
     // Reference to main game manager
     private MothGameManager gameManager;
@@ -43,9 +38,6 @@ public class MothColorCombo : MonoBehaviour
         {
             Debug.LogError("MothGameManager not found!");
         }
-
-        // Initialize last catch time
-        lastCatchTime = Time.time;
     }
 
     /// <summary>
@@ -63,79 +55,39 @@ public class MothColorCombo : MonoBehaviour
     /// <returns>Bonus points to award for this catch based on combo</returns>
     public int ProcessCaughtMoth(Color mothColor)
     {
-        // Track timing
-        float currentTime = Time.time;
-        float timeSinceLastCatch = currentTime - lastCatchTime;
-
-        // Check if this catch was too quick (suggesting non-intentional play)
-        bool isTooFast = timeSinceLastCatch < minTimeBetweenCatches;
-
-        if (showDebugMessages)
-        {
-            Debug.Log($"Moth caught: {ColorToName(mothColor)}, Time since last: {timeSinceLastCatch:F2}s, " +
-                     $"Is too fast: {isTooFast}");
-        }
-
-        // If the catch was too fast, we won't count it for combos
-        if (isTooFast)
-        {
-            // Flag that this catch was too fast
-            lastCatchWasTooFast = true;
-
-            // If we had a combo going, reset it
-            if (isComboActive)
-            {
-                if (showDebugMessages)
-                {
-                    Debug.Log($"Combo RESET: Too-fast catch breaks the combo");
-                }
-
-                // Reset combo state
-                isComboActive = false;
-                comboCount = 0;
-                pendingTimeReward = 0f;
-            }
-
-            // Update last catch time and return 0 points
-            lastCatchTime = currentTime;
-            return 0;
-        }
-
-        // This catch wasn't too fast, so process it normally
-        lastCatchWasTooFast = false;
-        int bonusPoints = 0;
         string colorName = ColorToName(mothColor);
+        int bonusPoints = 0;
 
-        // First moth caught or combo broken by different color
+        // Case 1: First moth or different color than current combo
         if (!isComboActive || !ColorMatches(mothColor, currentComboColor))
         {
-            // If we had an active combo of sufficient length, award the time and points
+            // If we had an active combo, finish it first
             if (isComboActive && comboCount >= minComboLength)
             {
                 // Calculate rewards
-                pendingTimeReward = baseTimeReward + (additionalTimePerCombo * (comboCount - minComboLength));
+                float timeReward = baseTimeReward + (additionalTimePerCombo * (comboCount - minComboLength));
                 bonusPoints = Mathf.RoundToInt(pointsPerCombo * comboCount);
 
                 if (showDebugMessages)
                 {
                     Debug.Log($"COMBO COMPLETED: {comboCount}x {ColorToName(currentComboColor)} → " +
-                             $"Awarding {pendingTimeReward:F1}s and {bonusPoints} points");
+                             $"Awarding {timeReward:F1}s and {bonusPoints} points");
                 }
 
                 // Award the time
-                AwardPendingTimeReward();
+                if (gameManager != null)
+                {
+                    gameManager.AddTimeReward(timeReward);
+                }
             }
             else if (isComboActive)
             {
-                // Combo was too short, no reward
+                // Combo was too short
                 if (showDebugMessages)
                 {
                     Debug.Log($"Combo too short: {comboCount}x {ColorToName(currentComboColor)} " +
                              $"(min {minComboLength} needed)");
                 }
-
-                pendingTimeReward = 0f;
-                bonusPoints = 0;
             }
 
             // Start new combo with this color
@@ -147,38 +99,21 @@ public class MothColorCombo : MonoBehaviour
             {
                 Debug.Log($"NEW COMBO STARTED: {colorName} (1)");
             }
-
-            // Update last catch time and return any bonus points
-            lastCatchTime = currentTime;
-            return bonusPoints;
         }
-
-        // Same color, increase combo
-        comboCount++;
-
-        if (showDebugMessages)
+        // Case 2: Same color as current combo
+        else
         {
-            Debug.Log($"COMBO CONTINUED: {colorName} ({comboCount})");
+            // Continue the combo
+            comboCount++;
+
+            if (showDebugMessages)
+            {
+                Debug.Log($"COMBO CONTINUED: {colorName} ({comboCount})");
+            }
         }
 
-        // Update last catch time and return 0 (no points until combo completion)
-        lastCatchTime = currentTime;
-        return 0;
-    }
-
-    /// <summary>
-    /// Add the pending time reward to the game timer
-    /// </summary>
-    private void AwardPendingTimeReward()
-    {
-        if (pendingTimeReward > 0 && gameManager != null)
-        {
-            // Use the AddTime method in MothGameManager
-            gameManager.AddTimeReward(pendingTimeReward);
-
-            // Reset pending reward
-            pendingTimeReward = 0;
-        }
+        // Return bonus points (if any)
+        return bonusPoints;
     }
 
     /// <summary>
@@ -199,9 +134,6 @@ public class MothColorCombo : MonoBehaviour
     {
         isComboActive = false;
         comboCount = 0;
-        pendingTimeReward = 0f;
-        lastCatchWasTooFast = false;
-        lastCatchTime = Time.time;
 
         if (showDebugMessages)
         {
@@ -247,8 +179,8 @@ public class MothColorCombo : MonoBehaviour
     /// <summary>
     /// Get the current combo information for debug or display
     /// </summary>
-    public (Color color, int count, float pendingReward) GetCurrentComboInfo()
+    public (Color color, int count) GetCurrentComboInfo()
     {
-        return (currentComboColor, comboCount, pendingTimeReward);
+        return (currentComboColor, comboCount);
     }
 }
