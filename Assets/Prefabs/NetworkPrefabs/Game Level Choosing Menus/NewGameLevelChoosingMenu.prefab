@@ -2115,6 +2115,9 @@ MonoBehaviour:
   syncInterval: 0
   prefabs:
   - {fileID: 3093340971583618290, guid: 73e85370294e91b47bca9d9d74188ee7, type: 3}
+  - {fileID: 6876682746856611867, guid: c75dea92ea8768f4c9c71148a7290b4a, type: 3}
+  - {fileID: 8653951469775406326, guid: dfc26618d28524549ba4d260abc87e58, type: 3}
+  - {fileID: 1750598833352266042, guid: 545dfeb8674377a42bce2f683dd45034, type: 3}
   objectToHide: {fileID: 133802235369550865}
   levelSpawningHeight: 0
   levelSpawningDepth: 12.29
@@ -2900,7 +2903,7 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  gameMenu: {fileID: 0}
+  gameMenu: {fileID: 2136633555198724153}
   eventSystem: {fileID: 8197128036744592908}
   gestureSettingsUI: {fileID: 0}
   userSelectionUI: {fileID: 0}
