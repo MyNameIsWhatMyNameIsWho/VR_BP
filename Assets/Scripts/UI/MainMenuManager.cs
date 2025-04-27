@@ -11,18 +11,50 @@ using UnityEngine.UI;
 /// </summary>
 public class MainMenuManager : NetworkBehaviour
 {
+    [Header("User Interface References")]
     [SerializeField] private GameObject mainMenuButtons;
     [SerializeField] public UserUIVR userUIVR;
+    [SerializeField] GameObject hidableMobileUI;
+    [SerializeField] GameObject gestureSettingsMobileUI;
+    [SerializeField] GameObject mobileMenuUI;
+    [SerializeField] TMP_Text changeMobileVisibilityButtonText;
+    [SerializeField] GameObject eventSystem;
+    [SerializeField] Slider sliderSound;
+
+    // Reference to upright redirector
+    private UprightRedirector uprightRedirector;
 
     private void Start()
     {
         // Force the system to consider a user as already active
         UserSystem.Instance.HasActiveUser = true;
-
         CheckHasActiveUser();
+
+        // Setup mobile UI components
+        if (mobileMenuUI != null)
+        {
+            mobileMenuUI.SetActive(!isServer);
+        }
+
+        uprightRedirector = FindFirstObjectByType<UprightRedirector>();
+
+        if (hidableMobileUI != null)
+        {
+            hidableMobileUI.SetActive(false);
+        }
+
+        if (gestureSettingsMobileUI != null)
+        {
+            gestureSettingsMobileUI.SetActive(false);
+        }
+
+        if (eventSystem != null && !isServer)
+        {
+            eventSystem.SetActive(true);
+        }
     }
 
-    [Command(requiresAuthority =false)]
+    [Command(requiresAuthority = false)]
     private void CheckHasActiveUser()
     {
         SetActivity(UserSystem.Instance.HasActiveUser);
@@ -31,8 +63,15 @@ public class MainMenuManager : NetworkBehaviour
     [ClientRpc]
     private void SetActivity(bool hasActiveUser)
     {
-        userUIVR.gameObject.SetActive(!hasActiveUser);
-        mainMenuButtons.SetActive(hasActiveUser);
+        if (userUIVR != null)
+        {
+            userUIVR.gameObject.SetActive(!hasActiveUser);
+        }
+
+        if (mainMenuButtons != null)
+        {
+            mainMenuButtons.SetActive(hasActiveUser);
+        }
     }
 
     /// <summary>
@@ -72,11 +111,19 @@ public class MainMenuManager : NetworkBehaviour
     /// Stops logging data. Logs out the user that was used for logging data.
     /// </summary>
     [ClientRpc]
-    public void LogOutUser() 
+    public void LogOutUser()
     {
-        mainMenuButtons.SetActive(false);
+        if (mainMenuButtons != null)
+        {
+            mainMenuButtons.SetActive(false);
+        }
+
         UserSystem.Instance.HasActiveUser = false;
-        userUIVR.gameObject.SetActive(true);
+
+        if (userUIVR != null)
+        {
+            userUIVR.gameObject.SetActive(true);
+        }
 
         if (!isServer) return;
         LoggerCommunicationProvider.Instance.StopLogging();
@@ -87,28 +134,7 @@ public class MainMenuManager : NetworkBehaviour
         Application.Quit();
     }
 
-    /*[SerializeField] GameObject hidableMobileUI;
-    [SerializeField] GameObject gestureSettingsMobileUI;
-    [SerializeField] GameObject mobileMenuUI;
-    [SerializeField] TMP_Text changeMobileVisibilityButtonText;
-    [SerializeField] GameObject eventSystem;
-    [SerializeField] Slider sliderSound;
-    private UprightRedirector uprightRedirector;
-
-    private void Start()
-    {
-        mobileMenuUI.SetActive(!isServer);
-        uprightRedirector = FindAnyObjectByType<UprightRedirector>();
-        hidableMobileUI.SetActive(false);
-        gestureSettingsMobileUI.SetActive(false);
-        if (!isServer) {
-            eventSystem.SetActive(true);
-        }
-    }*/
-    /*
     #region OnClient
-
-
     [Command(requiresAuthority = false)]
     public void CmdQuitGame()
     {
@@ -124,15 +150,34 @@ public class MainMenuManager : NetworkBehaviour
     public void ChangeMobileUIVisibility()
     {
         if (isServer) return;
-        bool hideUI = changeMobileVisibilityButtonText.text == "Skrýt";        
+
+        if (changeMobileVisibilityButtonText == null || hidableMobileUI == null)
+        {
+            Debug.LogError("Mobile UI references are null. Cannot change visibility.");
+            return;
+        }
+
+        bool hideUI = changeMobileVisibilityButtonText.text == "Skrýt";
         hidableMobileUI.SetActive(!hideUI);
-        gestureSettingsMobileUI.SetActive(false);
+
+        if (gestureSettingsMobileUI != null)
+        {
+            gestureSettingsMobileUI.SetActive(false);
+        }
+
         changeMobileVisibilityButtonText.text = hideUI ? "Možnosti" : "Skrýt";
     }
 
     public void ChangeGestureSettingsMenuVisibility()
     {
         if (isServer) return;
+
+        if (gestureSettingsMobileUI == null || hidableMobileUI == null)
+        {
+            Debug.LogError("Mobile UI references are null. Cannot change gesture settings visibility.");
+            return;
+        }
+
         gestureSettingsMobileUI.SetActive(!gestureSettingsMobileUI.activeSelf);
         hidableMobileUI.SetActive(!hidableMobileUI.activeSelf);
     }
@@ -140,20 +185,42 @@ public class MainMenuManager : NetworkBehaviour
     [Command(requiresAuthority = false)]
     public void CmdPerformUprightRedirection()
     {
-        uprightRedirector.PerformUprightRedirection();
+        if (uprightRedirector != null)
+        {
+            uprightRedirector.PerformUprightRedirection();
+        }
+        else
+        {
+            Debug.LogError("UprightRedirector is null. Cannot perform upright redirection.");
+        }
     }
 
     [Command(requiresAuthority = false)]
     public void CmdChangeTargetTransform(float valueZ)
     {
-        uprightRedirector.ChangeTargetTransform(valueZ);
+        if (uprightRedirector != null)
+        {
+            uprightRedirector.ChangeTargetTransform(valueZ);
+        }
+        else
+        {
+            Debug.LogError("UprightRedirector is null. Cannot change target transform.");
+        }
     }
 
     [Command(requiresAuthority = false)]
     public void CmdSetSoundVolume()
     {
-        AudioManager.Instance.SetSoundVolume(sliderSound.value);
+        if (sliderSound != null && AudioManager.Instance != null)
+        {
+            // Use the appropriate volume control method from AudioManager
+            AudioManager.Instance.CmdSetSFXVolume(sliderSound.value);
+            AudioManager.Instance.CmdSetMusicVolume(sliderSound.value);
+        }
+        else
+        {
+            Debug.LogError("SliderSound or AudioManager.Instance is null. Cannot set sound volume.");
+        }
     }
     #endregion //OnClient
-    */
 }
