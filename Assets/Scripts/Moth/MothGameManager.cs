@@ -12,9 +12,9 @@ public class MothGameManager : NetworkBehaviour
     public static MothGameManager Instance;
 
     [Header("Game Settings")]
-    [SerializeField] private float gameDuration = 60f; // Game length in seconds
+    [SerializeField] private float gameDuration = 60f; // Initial game length in seconds
     [SerializeField] private float respawnDelay = 1.0f; // Delay before spawning a new moth
-    [SerializeField] private int scorePerMoth = 1; // Points earned per catch
+    [SerializeField] private int scorePerMoth = 1; // Base points earned per catch
     [SerializeField] private bool timedMode = true; // If false, continues until player quits
 
     [Header("Spawn Settings")]
@@ -32,6 +32,11 @@ public class MothGameManager : NetworkBehaviour
     [SerializeField] private TextMeshPro finalScoreText;
     [SerializeField] private TextMeshPro highScoreText;
     [SerializeField] private NetworkVisualEffect successEffect;
+
+    // Color combo system
+    [Header("Color Combo System")]
+    [SerializeField] private bool enableColorCombos = true;
+    [HideInInspector] public MothColorCombo colorComboManager;
 
     // Game state
     private GameMenuManager menuManager;
@@ -82,6 +87,17 @@ public class MothGameManager : NetworkBehaviour
             return;
         }
         Instance = this;
+
+        // Get or add the color combo manager if enabled
+        if (enableColorCombos)
+        {
+            colorComboManager = GetComponent<MothColorCombo>();
+            if (colorComboManager == null)
+            {
+                colorComboManager = gameObject.AddComponent<MothColorCombo>();
+                Debug.Log("Added MothColorCombo component to MothGameManager");
+            }
+        }
     }
 
     private void Start()
@@ -114,14 +130,8 @@ public class MothGameManager : NetworkBehaviour
         // Initial score display
         ChangeScore(0);
 
-        // Start with instructions
-        StartCoroutine(PlayInstructions());
-    }
-
-    private IEnumerator PlayInstructions()
-    {
-        yield return null;
-        yield return new WaitForSeconds(3.0f);
+        // Start with instructions if needed
+        // StartCoroutine(PlayInstructions());
     }
 
     private void Update()
@@ -149,6 +159,20 @@ public class MothGameManager : NetworkBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        if (isServer)
+        {
+            // Clean up all active moths
+            foreach (var moth in activeMoths)
+            {
+                if (moth != null)
+                    NetworkServer.Destroy(moth);
+            }
+            activeMoths.Clear();
+        }
+    }
+
     // Function to maintain exactly 4 moths
     private void MaintainExactlyFourMoths()
     {
@@ -167,9 +191,9 @@ public class MothGameManager : NetworkBehaviour
         int currentMothCount = activeMoths.Count;
 
         // If we have too many moths, remove extras
-        if (currentMothCount > 4)
+        if (currentMothCount > maxActiveMoths)
         {
-            for (int i = currentMothCount - 1; i >= 4; i--)
+            for (int i = currentMothCount - 1; i >= maxActiveMoths; i--)
             {
                 if (activeMoths[i] != null)
                 {
@@ -180,26 +204,12 @@ public class MothGameManager : NetworkBehaviour
         }
 
         // If we need more moths and we're not waiting for respawn delay
-        if (currentMothCount < 4 && !isWaitingForRespawn)
+        if (currentMothCount < maxActiveMoths && !isWaitingForRespawn)
         {
-            for (int i = 0; i < 4 - currentMothCount; i++)
+            for (int i = 0; i < maxActiveMoths - currentMothCount; i++)
             {
                 SpawnMoth();
             }
-        }
-    }
-
-    private void OnDestroy()
-    {
-        if (isServer)
-        {
-            // Clean up all active moths
-            foreach (var moth in activeMoths)
-            {
-                if (moth != null)
-                    NetworkServer.Destroy(moth);
-            }
-            activeMoths.Clear();
         }
     }
 
@@ -307,6 +317,13 @@ public class MothGameManager : NetworkBehaviour
         totalMothsSpawned = 0;
         gameRunning = true;
         isWaitingForRespawn = false;
+
+        // Reset combo tracking if available
+        if (enableColorCombos && colorComboManager != null)
+        {
+            colorComboManager.ResetCombo();
+        }
+
         ClearActiveMoths();
         ChangeScore(0);
 
@@ -399,6 +416,7 @@ public class MothGameManager : NetworkBehaviour
             Moth mothComponent = moth.GetComponent<Moth>();
             if (mothComponent != null)
             {
+                // Initialize moth with color system if available
                 mothComponent.Initialize();
 
                 // Set the moth's zone properties
@@ -428,8 +446,29 @@ public class MothGameManager : NetworkBehaviour
     {
         if (!gameRunning) return;
 
+        // Calculate points & time rewards from color combo system
+        int pointsToAdd = scorePerMoth;
+
+        // Only process color combos if enabled and available
+        if (enableColorCombos && colorComboManager != null && moth != null)
+        {
+            // Process the caught moth in the combo system
+            int bonusPoints = colorComboManager.ProcessCaughtMoth(moth.MothColor);
+
+            // Add any bonus points from combos
+            if (bonusPoints > 0)
+            {
+                pointsToAdd += bonusPoints;
+                // Visual/audio feedback for combo bonus
+                if (successEffect != null)
+                {
+                    PlayEffectAtPosition(moth.transform.position, true);
+                }
+            }
+        }
+
         // Add score
-        score += scorePerMoth;
+        score += pointsToAdd;
         ChangeScore(score);
         totalMothsCaught++;
 
@@ -477,6 +516,53 @@ public class MothGameManager : NetworkBehaviour
         StartCoroutine(DelayRespawn());
     }
 
+    // Method to add time to the game timer from combo rewards
+    public void AddTimeReward(float timeAmount)
+    {
+        if (!gameRunning || !timedMode || timeAmount <= 0) return;
+
+        // Add time to game duration (effectively adding time to the timer)
+        gameDuration += timeAmount;
+
+        Debug.Log($"*** TIME REWARD: +{timeAmount:F1}s added to game timer ***");
+
+        // Visual effect for time extension
+        if (timeText != null)
+        {
+            // Flash the time text or change its color briefly
+            StartCoroutine(FlashTimeText());
+        }
+
+        // Play a sound to indicate time bonus
+        try
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("SuccessFeedback");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("Error playing time bonus sound: " + e.Message);
+        }
+    }
+
+    // Coroutine to flash the time text when time is added
+    private IEnumerator FlashTimeText()
+    {
+        if (timeText == null) yield break;
+
+        // Save original color
+        Color originalColor = timeText.color;
+
+        // Flash green
+        timeText.color = Color.green;
+        yield return new WaitForSeconds(0.2f);
+
+        // Back to original color
+        timeText.color = originalColor;
+    }
+
     private IEnumerator DelayRespawn()
     {
         isWaitingForRespawn = true;
@@ -487,12 +573,24 @@ public class MothGameManager : NetworkBehaviour
 
     private void PlaySuccessEffects(Vector3 position)
     {
+        PlayEffectAtPosition(position, false);
+    }
+
+    private void PlayEffectAtPosition(Vector3 position, bool isComboEffect)
+    {
         if (successEffect != null)
         {
             try
             {
                 NetworkVisualEffect effect = Instantiate(successEffect, position, Quaternion.identity);
                 NetworkServer.Spawn(effect.gameObject);
+
+                // Make combo effects larger/brighter
+                if (isComboEffect)
+                {
+                    effect.transform.localScale *= 1.5f;
+                }
+
                 effect.Play();
             }
             catch (Exception e)
@@ -543,6 +641,12 @@ public class MothGameManager : NetworkBehaviour
 
         // Hide end game UI
         DisplayEndGameInfo(false, 0, 0);
+
+        // Reset combo tracking
+        if (enableColorCombos && colorComboManager != null)
+        {
+            colorComboManager.ResetCombo();
+        }
 
         // Start fresh game
         StartGame();

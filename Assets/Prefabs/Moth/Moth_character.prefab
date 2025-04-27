@@ -52,12 +52,10 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  baseMovementSpeed: 0.7
-  debugMode: 1
-  minDistanceFromPlayer: 0.2
-  maxDistanceFromPlayer: 0.9
-  flyingHeight: 0.8
-  flyingWidth: 1
+  moveSpeed: 0.3
+  changeDirectionTime: 3
+  zoneCenter: {x: 0, y: 1.5, z: 1}
+  zoneSize: {x: 2, y: 1, z: 1}
   OnMothCaught:
     m_PersistentCalls:
       m_Calls: []

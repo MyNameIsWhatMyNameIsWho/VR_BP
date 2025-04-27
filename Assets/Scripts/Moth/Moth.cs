@@ -21,17 +21,49 @@ public class Moth : NetworkBehaviour
     private float nextChangeTime;
     private bool isActive = true;
 
-    public void Initialize()
+    // Color of this moth - primarily for combo tracking
+    [SyncVar] private Color mothColor;
+    public Color MothColor => mothColor;
+
+    // Renderer cache
+    private MeshRenderer meshRenderer;
+
+    public void Initialize(Color? colorOverride = null)
     {
-        // Set random color
-        MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (renderer != null && renderer.material != null)
+        // Cache renderer reference
+        meshRenderer = GetComponent<MeshRenderer>();
+
+        // Set color (either from provided value or from color manager)
+        if (colorOverride.HasValue)
         {
-            renderer.material.color = new Color(
+            mothColor = colorOverride.Value;
+        }
+        else if (MothGameManager.Instance != null &&
+                 MothGameManager.Instance.colorComboManager != null)
+        {
+            // Get random color from the color combo manager
+            mothColor = MothGameManager.Instance.colorComboManager.GetRandomMothColor();
+            Debug.Log($"Moth spawned with color: {ColorToName(mothColor)}");
+        }
+        else
+        {
+            // Fallback to random color in case combo manager isn't available
+            mothColor = new Color(
                 UnityEngine.Random.Range(0.5f, 1.0f),
                 UnityEngine.Random.Range(0.5f, 1.0f),
                 UnityEngine.Random.Range(0.5f, 1.0f)
             );
+            Debug.Log("Using fallback random color for moth");
+        }
+
+        // Apply color to renderer
+        if (meshRenderer != null && meshRenderer.material != null)
+        {
+            meshRenderer.material.color = mothColor;
+        }
+        else
+        {
+            Debug.LogWarning("Could not find MeshRenderer to apply color");
         }
 
         // Pick a random direction
@@ -141,5 +173,17 @@ public class Moth : NetworkBehaviour
             transform.position += awayDirection * 0.1f;
             moveDirection = awayDirection;
         }
+    }
+
+    // Helper method to convert color to name for debugging
+    private string ColorToName(Color color)
+    {
+        // Simple color name approximation
+        if (color.r > 0.7f && color.g < 0.5f && color.b < 0.5f) return "Red";
+        if (color.r < 0.5f && color.g > 0.7f && color.b < 0.5f) return "Green";
+        if (color.r < 0.5f && color.g < 0.5f && color.b > 0.7f) return "Blue";
+        if (color.r > 0.7f && color.g > 0.7f && color.b < 0.5f) return "Yellow";
+        if (color.r > 0.7f && color.g < 0.5f && color.b > 0.7f) return "Purple";
+        return "Unknown";
     }
 }

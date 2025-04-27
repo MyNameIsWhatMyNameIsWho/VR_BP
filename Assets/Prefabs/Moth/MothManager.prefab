@@ -417,6 +417,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7220462270889839084}
   - component: {fileID: 3247521400157097605}
+  - component: {fileID: 9175400404888919776}
   - component: {fileID: -4041341254498549845}
   m_Layer: 0
   m_Name: MothManager
@@ -479,12 +480,37 @@ MonoBehaviour:
   finalScoreText: {fileID: 4499558253332574733}
   highScoreText: {fileID: 7037428679258922479}
   successEffect: {fileID: 0}
+  enableColorCombos: 1
+  colorComboManager: {fileID: 9175400404888919776}
   OnGameStart:
     m_PersistentCalls:
       m_Calls: []
   OnGameEnd:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &9175400404888919776
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3093340971583618290}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a8ddd4f1e211d843b873bb4d610ec28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mothColors:
+  - {r: 1, g: 0.3, b: 0.3, a: 1}
+  - {r: 0.3, g: 0.8, b: 0.3, a: 1}
+  - {r: 0.3, g: 0.3, b: 1, a: 1}
+  - {r: 1, g: 1, b: 0.3, a: 1}
+  minTimeBetweenCatches: 0.5
+  minComboLength: 2
+  baseTimeReward: 1
+  additionalTimePerCombo: 2
+  pointsPerCombo: 5
+  showDebugMessages: 1
 --- !u!114 &-4041341254498549845
 MonoBehaviour:
   m_ObjectHideFlags: 0

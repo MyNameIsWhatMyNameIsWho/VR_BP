@@ -51,8 +51,8 @@ public class NewGameManager : NetworkBehaviour
     [SerializeField] private float collectibleSpawnInterval = 2f;
     [SerializeField] private float objectSpawnY = 10f;
 
-    [Header("Tutorial Settings")]
-    [SerializeField] private bool isFirstPlay = true; // Track if this is first play
+    //[Header("Tutorial Settings")]
+    //[SerializeField] private bool isFirstPlay; // Track if this is first play
     public bool IsFirstPlay()
     {
         // Return true only if this is literally the very first play
@@ -1010,7 +1010,7 @@ public class NewGameManager : NetworkBehaviour
         Debug.Log("RestartGame called");
 
         // Set isFirstPlay to false since this is a restart
-        isFirstPlay = false;
+       // isFirstPlay = false;
         hasPlayedAnyGame = true;
 
         // Reset adaptive spawner tracking
