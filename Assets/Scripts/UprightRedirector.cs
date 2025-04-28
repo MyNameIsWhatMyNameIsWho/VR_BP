@@ -12,11 +12,14 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public class UprightRedirector : NetworkBehaviour
 {
-    public static UprightRedirector Instance; 
+    public static UprightRedirector Instance;
 
     [SerializeField] private Transform playerCurrentCameraTransform;
     [SerializeField] private XROrigin origin;
     [SerializeField] public Transform targetTransform;
+
+    // Add this new event for audio tutorial integration
+    public UnityEvent OnCalibrationComplete = new UnityEvent();
 
     private CallDelayer callDelayer;
     private float waitForSecondsBeforeUR = 2.0f;
@@ -30,10 +33,13 @@ public class UprightRedirector : NetworkBehaviour
 
     private void Awake()
     {
-        if (Instance) {
+        if (Instance)
+        {
             Destroy(gameObject);
             return;
-        } else {
+        }
+        else
+        {
             Instance = this;
         }
     }
@@ -44,8 +50,8 @@ public class UprightRedirector : NetworkBehaviour
         SceneManager.sceneLoaded += FindTargetTransform;
         callDelayer = gameObject.AddComponent<CallDelayer>();
         callDelayer.action.AddListener(PerformUprightRedirection);
-        offsetOfTargetTransform =  Vector3.zero;
-        callDelayer.StartCall(1.0f);   
+        offsetOfTargetTransform = Vector3.zero;
+        callDelayer.StartCall(1.0f);
     }
     private void Start()
     {
@@ -65,14 +71,15 @@ public class UprightRedirector : NetworkBehaviour
     private void FindTargetTransform(Scene scene, LoadSceneMode sceneMode)
     {
         targetTransform = GameObject.Find("TargetTransform").transform;
-        if (!URWasCalled) { 
+        if (!URWasCalled)
+        {
             PerformTranslation();
         }
     }
 
     public void ChangeTargetTransform(float valueZ)
     {
-        offsetOfTargetTransform += new Vector3(0, 0, valueZ);        
+        offsetOfTargetTransform += new Vector3(0, 0, valueZ);
         origin.transform.position += targetTransform.transform.position - playerCurrentCameraTransform.position + offsetOfTargetTransform;
     }
 
@@ -81,7 +88,7 @@ public class UprightRedirector : NetworkBehaviour
     /// </summary>
     public void PerformUprightRedirection()
     {
-        LoggerCommunicationProvider.Instance.UprightRedirectionPerformed(Vector3.Angle(playerCurrentCameraTransform.forward, targetTransform.up)-90.0f);
+        LoggerCommunicationProvider.Instance.UprightRedirectionPerformed(Vector3.Angle(playerCurrentCameraTransform.forward, targetTransform.up) - 90.0f);
         //print(Vector3.Angle(playerCurrentCameraTransform.forward, targetTransform.up) - 90.0f);
         Vector3 rotationDifference = targetTransform.transform.rotation.eulerAngles - playerCurrentCameraTransform.rotation.eulerAngles;
         origin.RotateAroundCameraPosition(playerCurrentCameraTransform.right, rotationDifference.x);
@@ -90,6 +97,8 @@ public class UprightRedirector : NetworkBehaviour
 
         PerformTranslation();
 
+        // Add this line to notify listeners (like the audio tutorial) when calibration is complete
+        OnCalibrationComplete.Invoke();
     }
 
     public void PerformTranslation()
@@ -103,7 +112,8 @@ public class UprightRedirector : NetworkBehaviour
         if (gestureType != GestureType.Paper) return;
         if (isLeft) isPaperL = begins;
         else isPaperR = begins;
-        if (isPaperL && isPaperR) {
+        if (isPaperL && isPaperR)
+        {
             callDelayer.StartCall(waitForSecondsBeforeUR, GDetector.handL, GDetector.handR);
             AudioManager.Instance.PlaySFX("URFeedback");
             URWasCalled = true;

@@ -42,9 +42,19 @@ public class VRButton : NetworkBehaviour
         interactable.OnRaycastCollisionExit.AddListener(PressEnd);
     }
 
+    // This is called when the button action is actually performed, after the timer
     private void OnEnable()
     {
         callDelayer.action.AddListener(OnButtonPress.Invoke);
+
+        // Add this - notify the tutorial when the button action is ACTUALLY performed
+        callDelayer.action.AddListener(() => {
+            if (isServer && MainMenuAudioTutorial.Instance != null)
+            {
+                MainMenuAudioTutorial.Instance.NotifyButtonPressed();
+            }
+        });
+
         if (!isServer) return;
         interactable.OnPhysicalCollisionEnter.AddListener(PressBegin);
         interactable.OnPhysicalCollisionExit.AddListener(PressEnd);
@@ -78,18 +88,22 @@ public class VRButton : NetworkBehaviour
         var handR = GestureDetector.Instance.handR;
 
         HandManager hand = isLeft ? handL : handR;
-        
+
         if (pressed)
         {
-            if (isServer) { 
+            if (isServer)
+            {
                 transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z - pressedPositionDifference);
-                callDelayer.StartCall(secondsBeforeAction, hand); 
+                callDelayer.StartCall(secondsBeforeAction, hand);
             }
             AudioManager.Instance.PlaySFX("ButtonFeedback");
-        } else {
-            if (isServer) { 
+        }
+        else
+        {
+            if (isServer)
+            {
                 transform.position = defaultPosition;
-                callDelayer.StopCall(); 
+                callDelayer.StopCall();
             }
             AudioManager.Instance.StopPlayingSFX();
         }
@@ -100,6 +114,9 @@ public class VRButton : NetworkBehaviour
         var handL = GestureDetector.Instance.handL;
 
         RpcPress(true, interactor == handL.Interactor);
+
+        // We've moved the notification to OnEnable where it's connected to callDelayer.action
+        // so it only fires when the button is actually activated, not just when pressing begins
     }
 
     public void PressEnd(Interactor interactor)

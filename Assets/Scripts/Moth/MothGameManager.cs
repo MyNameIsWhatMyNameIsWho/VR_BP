@@ -673,6 +673,25 @@ public class MothGameManager : NetworkBehaviour
     {
         EndGame();
 
+        // Fix for stuck rays - reset the hand rays before returning to menu
+        if (GestureDetector.Instance != null)
+        {
+            // Reset ray visualization on both hands
+            if (GestureDetector.Instance.handL != null && GestureDetector.Instance.handL.Interactor != null)
+            {
+                GestureDetector.Instance.handL.Interactor.SetRayEndpoints(Vector3.zero, Vector3.zero);
+                GestureDetector.Instance.handL.Interactor.searchesForCollision = true;
+                GestureDetector.Instance.handL.Interactor.visualizesRaycast = true;
+            }
+
+            if (GestureDetector.Instance.handR != null && GestureDetector.Instance.handR.Interactor != null)
+            {
+                GestureDetector.Instance.handR.Interactor.SetRayEndpoints(Vector3.zero, Vector3.zero);
+                GestureDetector.Instance.handR.Interactor.searchesForCollision = true;
+                GestureDetector.Instance.handR.Interactor.visualizesRaycast = true;
+            }
+        }
+
         if (menuManager != null)
         {
             menuManager.ReturnToGameMenu();
