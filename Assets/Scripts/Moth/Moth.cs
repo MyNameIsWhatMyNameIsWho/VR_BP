@@ -162,6 +162,13 @@ public class Moth : NetworkBehaviour
         // Check for player hands
         if (other.gameObject.layer == LayerMask.NameToLayer("PlayerHands"))
         {
+            // Check if moth interaction is allowed (via MothGameManager)
+            if (MothGameManager.Instance != null && !MothGameManager.Instance.AreMothsInteractive())
+            {
+                // Moths not yet interactive - ignore collision
+                return;
+            }
+
             isActive = false;
             OnMothCaught.Invoke(this);
         }

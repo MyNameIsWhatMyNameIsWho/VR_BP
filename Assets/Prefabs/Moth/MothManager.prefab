@@ -418,6 +418,7 @@ GameObject:
   - component: {fileID: 7220462270889839084}
   - component: {fileID: 3247521400157097605}
   - component: {fileID: 9175400404888919776}
+  - component: {fileID: 2603373783688940075}
   - component: {fileID: -4041341254498549845}
   m_Layer: 0
   m_Name: MothManager
@@ -482,6 +483,7 @@ MonoBehaviour:
   successEffect: {fileID: 0}
   enableColorCombos: 1
   colorComboManager: {fileID: 9175400404888919776}
+  audioTutorial: {fileID: 2603373783688940075}
   OnGameStart:
     m_PersistentCalls:
       m_Calls: []
@@ -507,9 +509,27 @@ MonoBehaviour:
   - {r: 1, g: 1, b: 0.3, a: 1}
   minComboLength: 2
   baseTimeReward: 0
-  additionalTimePerCombo: 2
+  additionalTimePerCombo: 5
   pointsPerCombo: 10
   showDebugMessages: 1
+--- !u!114 &2603373783688940075
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3093340971583618290}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41a8758d33a318449bd455fe7e459ad8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  rulesClip: {fileID: 8300000, guid: 83048e6528e3b5b459bcdecaf0ccd070, type: 3}
+  initialDelay: 0.5
+  motionEnableDelay: 0.5
 --- !u!114 &-4041341254498549845
 MonoBehaviour:
   m_ObjectHideFlags: 0

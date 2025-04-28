@@ -61,10 +61,10 @@ public class MothColorCombo : MonoBehaviour
         // Case 1: First moth or different color than current combo
         if (!isComboActive || !ColorMatches(mothColor, currentComboColor))
         {
-            // If we had an active combo, finish it first
+            // If we had an active combo, finish it first and award points/time
             if (isComboActive && comboCount >= minComboLength)
             {
-                // Calculate rewards
+                // Calculate rewards - progressively increasing with combo length
                 float timeReward = baseTimeReward + (additionalTimePerCombo * (comboCount - minComboLength));
                 bonusPoints = Mathf.RoundToInt(pointsPerCombo * comboCount);
 
@@ -78,6 +78,12 @@ public class MothColorCombo : MonoBehaviour
                 if (gameManager != null)
                 {
                     gameManager.AddTimeReward(timeReward);
+
+                    // Play a sound to indicate combo success
+                    if (AudioManager.Instance != null)
+                    {
+                        AudioManager.Instance.PlaySFX("SuccessFeedback");
+                    }
                 }
             }
             else if (isComboActive)

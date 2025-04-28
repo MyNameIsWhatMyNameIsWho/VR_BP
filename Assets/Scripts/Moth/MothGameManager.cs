@@ -38,6 +38,9 @@ public class MothGameManager : NetworkBehaviour
     [SerializeField] private bool enableColorCombos = true;
     [HideInInspector] public MothColorCombo colorComboManager;
 
+    [Header("References")]
+    [SerializeField] private MothGameAudioTutorial audioTutorial;  // Reference to audio tutorial
+
     // Game state
     private GameMenuManager menuManager;
     private bool gameRunning = false;
@@ -47,36 +50,47 @@ public class MothGameManager : NetworkBehaviour
     private int totalMothsSpawned = 0;
     private List<GameObject> activeMoths = new List<GameObject>();
     private bool isWaitingForRespawn = false;
+    private bool mothsInteractive = false;  // Track whether moths should be interactive
 
     // Events
     public UnityEvent OnGameStart;
     public UnityEvent OnGameEnd;
 
+    private static float sessionHighscoreMothGame = -1f;
+
     private float Highscore
     {
         get
         {
-            try
-            {
-                return UserSystem.Instance.UserData.HighscoreMothGame;
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("Error accessing highscore: " + e.Message);
-                return 0;
-            }
+            // ALWAYS return the current session value, ignoring saved data
+            // Only use the saved data to initialize once at the start
+            return sessionHighscoreMothGame;
         }
         set
         {
+            // Update the session variable
+            sessionHighscoreMothGame = value;
+
+            // Also save to persistent storage (just in case)
             try
             {
-                UserSystem.Instance.UserData.HighscoreMothGame = value;
+                if (UserSystem.Instance != null && UserSystem.Instance.UserData != null)
+                {
+                    UserSystem.Instance.UserData.HighscoreMothGame = value;
+                }
             }
             catch (Exception e)
             {
-                Debug.LogError("Error setting highscore: " + e.Message);
+                Debug.LogError("Error saving highscore: " + e.Message);
             }
         }
+    }
+
+    private void ForceHighscoreReset()
+    {
+        // Force the highscore to 0 for this session
+        sessionHighscoreMothGame = 0;
+        Debug.Log("Highscore forcibly reset to 0");
     }
 
     private void Awake()
@@ -100,39 +114,39 @@ public class MothGameManager : NetworkBehaviour
         }
     }
 
-    private void Start()
+   private void Start()
+{
+    menuManager = FindFirstObjectByType<GameMenuManager>();
+
+    // ALWAYS force reset the highscore when the game starts
+    ForceHighscoreReset();
+
+    OnGameEnd.AddListener(() => {
+        initialButtons.SetActive(true);
+        inGameButton.SetActive(false);
+    });
+
+    OnGameStart.AddListener(() => {
+        initialButtons.SetActive(false);
+        inGameButton.SetActive(true);
+    });
+
+    if (endgameInfo != null)
     {
-        menuManager = FindFirstObjectByType<GameMenuManager>();
-
-        OnGameEnd.AddListener(() => {
-            initialButtons.SetActive(true);
-            inGameButton.SetActive(false);
-        });
-
-        OnGameStart.AddListener(() => {
-            initialButtons.SetActive(false);
-            inGameButton.SetActive(true);
-        });
-
-        if (endgameInfo != null)
-        {
-            endgameInfo.SetActive(false);
-        }
-
-        if (!isServer) return;
-
-        // Hide timer if not in timed mode
-        if (!timedMode && timeText != null)
-        {
-            timeText.gameObject.SetActive(false);
-        }
-
-        // Initial score display
-        ChangeScore(0);
-
-        // Start with instructions if needed
-        // StartCoroutine(PlayInstructions());
+        endgameInfo.SetActive(false);
     }
+
+    if (!isServer) return;
+
+    // Hide timer if not in timed mode
+    if (!timedMode && timeText != null)
+    {
+        timeText.gameObject.SetActive(false);
+    }
+
+    // Initial score display
+    ChangeScore(0);
+}
 
     private void Update()
     {
@@ -247,17 +261,25 @@ public class MothGameManager : NetworkBehaviour
         }
         activeMoths.Clear();
 
-        // Wait a moment
-        yield return new WaitForSeconds(respawnDelay);
-
         // Update highscore if needed
         if (Highscore < score)
         {
             Highscore = score;
         }
 
-        // Show end game UI
+        // Show end game UI IMMEDIATELY - without waiting
         DisplayEndGameInfo(true, Highscore, score);
+
+        // Play visual effect
+        if (successEffect != null)
+        {
+            NetworkVisualEffect vfx = Instantiate(successEffect, new Vector3(0, 1.5f, 1f), Quaternion.identity);
+            NetworkServer.Spawn(vfx.gameObject);
+            vfx.Play();
+        }
+
+        // Wait a small delay before logging data (this doesn't affect UI display)
+        yield return new WaitForSeconds(0.2f);
 
         // Log game data
         try
@@ -316,6 +338,7 @@ public class MothGameManager : NetworkBehaviour
         totalMothsCaught = 0;
         totalMothsSpawned = 0;
         gameRunning = true;
+        mothsInteractive = false;  // Start with moths not interactive
         isWaitingForRespawn = false;
 
         // Reset combo tracking if available
@@ -331,6 +354,17 @@ public class MothGameManager : NetworkBehaviour
         if (timedMode && timeText != null)
         {
             timeText.gameObject.SetActive(true);
+        }
+
+        // Start audio tutorial if available
+        if (audioTutorial != null)
+        {
+            audioTutorial.OnGameStart();
+        }
+        else
+        {
+            // If no audio tutorial, enable moth interaction immediately
+            mothsInteractive = true;
         }
 
         // Spawn initial moths
@@ -444,7 +478,7 @@ public class MothGameManager : NetworkBehaviour
 
     public void MothCaught(Moth moth)
     {
-        if (!gameRunning) return;
+        if (!gameRunning || !mothsInteractive) return;  // Check mothsInteractive flag
 
         // Calculate points & time rewards from color combo system
         int pointsToAdd = scorePerMoth;
@@ -545,6 +579,19 @@ public class MothGameManager : NetworkBehaviour
         {
             Debug.LogWarning("Error playing time bonus sound: " + e.Message);
         }
+    }
+
+    // Method to enable moth interaction
+    public void EnableMothInteraction()
+    {
+        mothsInteractive = true;
+        Debug.Log("Moth interaction enabled");
+    }
+
+    // Method to check if moths should be interactive
+    public bool AreMothsInteractive()
+    {
+        return mothsInteractive;
     }
 
     // Coroutine to flash the time text when time is added
