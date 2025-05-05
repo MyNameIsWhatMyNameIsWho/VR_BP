@@ -24,6 +24,9 @@ public class MainMenuAudioTutorial : NetworkBehaviour
     [SerializeField] private float reminderDelay = 15f;              // Time before playing reminder
     [SerializeField] private float initialDelay = 1.0f;              // Delay before starting tutorial
 
+    // Add debug text to see the current timer value
+    private float currentReminderTimer = 0f;
+
     // Player prefs key to track if tutorial has been completed
     private const string TUTORIAL_COMPLETED_KEY = "MainMenuTutorialCompleted";
 
@@ -169,18 +172,28 @@ public class MainMenuAudioTutorial : NetworkBehaviour
         currentState = TutorialState.WaitingForCalibration;
         isWaitingForGesture = true;
 
-        float timeWaiting = 0f;
+        // Reset the timer each time we start waiting
+        currentReminderTimer = 0f;
 
         // Wait for calibration or remind if taking too long
         while (!calibrationCompleted)
         {
-            timeWaiting += Time.deltaTime;
+            // Increment timer with actual elapsed time
+            currentReminderTimer += Time.deltaTime;
 
-            // Only play reminder if we're still waiting for calibration and no audio is currently playing
-            if (timeWaiting >= reminderDelay && !audioSource.isPlaying && currentState == TutorialState.WaitingForCalibration)
+            // Debug to see the current timer value
+            if (currentReminderTimer % 5 < 0.1f) // Log about every 5 seconds
             {
+                Debug.Log($"Calibration reminder timer: {currentReminderTimer:F1}/{reminderDelay:F1}");
+            }
+
+            // Only play reminder if we're still waiting for calibration, no audio is playing,
+            // and the full reminder delay has passed
+            if (currentReminderTimer >= reminderDelay && !audioSource.isPlaying && currentState == TutorialState.WaitingForCalibration)
+            {
+                Debug.Log($"Playing calibration reminder after {currentReminderTimer:F1} seconds");
                 PlayAudioClipServerRpc(2); // calibrationReminderClip
-                timeWaiting = 0f;
+                currentReminderTimer = 0f; // Reset timer after playing reminder
             }
 
             yield return null;
@@ -217,18 +230,28 @@ public class MainMenuAudioTutorial : NetworkBehaviour
         currentState = TutorialState.WaitingForRockGesture;
         isWaitingForGesture = true;
 
-        float timeWaiting = 0f;
+        // Reset the timer each time we start waiting
+        currentReminderTimer = 0f;
 
         // Wait for rock gesture or remind if taking too long
         while (!rockGestureCompleted)
         {
-            timeWaiting += Time.deltaTime;
+            // Increment timer with actual elapsed time
+            currentReminderTimer += Time.deltaTime;
 
-            // Only play reminder if we're still waiting for rock gesture and no audio is currently playing
-            if (timeWaiting >= reminderDelay && !audioSource.isPlaying && currentState == TutorialState.WaitingForRockGesture)
+            // Debug to see the current timer value
+            if (currentReminderTimer % 5 < 0.1f) // Log about every 5 seconds
             {
+                Debug.Log($"Rock gesture reminder timer: {currentReminderTimer:F1}/{reminderDelay:F1}");
+            }
+
+            // Only play reminder if we're still waiting for rock gesture, no audio is playing,
+            // and the full reminder delay has passed
+            if (currentReminderTimer >= reminderDelay && !audioSource.isPlaying && currentState == TutorialState.WaitingForRockGesture)
+            {
+                Debug.Log($"Playing rock gesture reminder after {currentReminderTimer:F1} seconds");
                 PlayAudioClipServerRpc(5); // rockGestureReminderClip
-                timeWaiting = 0f;
+                currentReminderTimer = 0f; // Reset timer after playing reminder
             }
 
             yield return null;
