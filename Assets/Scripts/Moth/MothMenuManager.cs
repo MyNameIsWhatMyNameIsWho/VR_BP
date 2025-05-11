@@ -70,6 +70,21 @@ public class MothMenuManager : GameMenuManager
         }
     }
 
+    //[Command(requiresAuthority = false)]
+    //public void CmdReplayTutorial()
+    //{
+    //    if (mothGameManager != null && mothGameManager.audioTutorial != null)
+    //    {
+    //        // Replay the tutorial by calling the play method on the audio tutorial
+    //        mothGameManager.audioTutorial.OnGameStart();
+    //        Debug.Log("Replaying moth game tutorial");
+    //    }
+    //    else
+    //    {
+    //        Debug.LogError("MothGameManager or audioTutorial is null, cannot replay tutorial");
+    //    }
+    //}
+
     // Override LoadLevel
     [ClientRpc]
     public override void LoadLevel(int level)

@@ -25,8 +25,25 @@ public class Moth : NetworkBehaviour
     [SyncVar] private Color mothColor;
     public Color MothColor => mothColor;
 
+    // For position and rotation sync
+    private Vector3 currentPosition;
+    private Quaternion currentRotation;
+    
+    // Sync update frequency - renamed to avoid conflicts with NetworkBehaviour
+    private float mothSyncInterval = 0.05f; // 20 updates per second
+    private float mothLastSyncTime = 0f;
+
     // Renderer cache
     private MeshRenderer meshRenderer;
+
+    private void Awake()
+    {
+        // We're going to handle position updates ourselves instead of using NetworkTransform
+        if (TryGetComponent<NetworkTransform>(out var networkTransform))
+        {
+            Destroy(networkTransform);
+        }
+    }
 
     public void Initialize(Color? colorOverride = null)
     {
@@ -79,6 +96,10 @@ public class Moth : NetworkBehaviour
             collider.isTrigger = true;
             collider.radius = 0.3f;
         }
+        
+        // Initialize position and rotation sync variables
+        currentPosition = transform.position;
+        currentRotation = transform.rotation;
     }
 
     private void Update()
@@ -93,7 +114,7 @@ public class Moth : NetworkBehaviour
         }
 
         // Move in current direction
-        transform.position += moveDirection * moveSpeed * Time.deltaTime;
+        currentPosition += moveDirection * moveSpeed * Time.deltaTime;
 
         // Check boundaries and bounce if needed
         CheckBoundaries();
@@ -101,11 +122,32 @@ public class Moth : NetworkBehaviour
         // Make the moth face the direction it's moving
         if (moveDirection != Vector3.zero)
         {
-            transform.forward = moveDirection;
+            currentRotation = Quaternion.LookRotation(moveDirection);
         }
 
         // Add some rotation for visual interest
-        transform.Rotate(0, Time.deltaTime * 90f, 0, Space.Self);
+        currentRotation *= Quaternion.Euler(0, Time.deltaTime * 90f, 0);
+        
+        // Apply position and rotation to server object
+        transform.position = currentPosition;
+        transform.rotation = currentRotation;
+        
+        // Sync position and rotation to clients at regular intervals
+        if (Time.time - mothLastSyncTime > mothSyncInterval)
+        {
+            RpcUpdatePositionAndRotation(currentPosition, currentRotation);
+            mothLastSyncTime = Time.time;
+        }
+    }
+    
+    [ClientRpc]
+    private void RpcUpdatePositionAndRotation(Vector3 newPosition, Quaternion newRotation)
+    {
+        if (isServer) return; // Server already updated in Update
+        
+        // Apply position and rotation on clients
+        transform.position = newPosition;
+        transform.rotation = newRotation;
     }
 
     private void PickNewDirection()
@@ -123,29 +165,29 @@ public class Moth : NetworkBehaviour
         bool needNewDirection = false;
 
         // Check if we're outside the zone and bounce
-        if (transform.position.x < zoneCenter.x - halfSize.x || transform.position.x > zoneCenter.x + halfSize.x)
+        if (currentPosition.x < zoneCenter.x - halfSize.x || currentPosition.x > zoneCenter.x + halfSize.x)
         {
             moveDirection.x = -moveDirection.x;
             needNewDirection = true;
         }
 
-        if (transform.position.y < zoneCenter.y - halfSize.y || transform.position.y > zoneCenter.y + halfSize.y)
+        if (currentPosition.y < zoneCenter.y - halfSize.y || currentPosition.y > zoneCenter.y + halfSize.y)
         {
             moveDirection.y = -moveDirection.y;
             needNewDirection = true;
         }
 
-        if (transform.position.z < zoneCenter.z - halfSize.z || transform.position.z > zoneCenter.z + halfSize.z)
+        if (currentPosition.z < zoneCenter.z - halfSize.z || currentPosition.z > zoneCenter.z + halfSize.z)
         {
             moveDirection.z = -moveDirection.z;
             needNewDirection = true;
         }
 
         // Ensure we stay in boundaries
-        transform.position = new Vector3(
-            Mathf.Clamp(transform.position.x, zoneCenter.x - halfSize.x, zoneCenter.x + halfSize.x),
-            Mathf.Clamp(transform.position.y, zoneCenter.y - halfSize.y, zoneCenter.y + halfSize.y),
-            Mathf.Clamp(transform.position.z, zoneCenter.z - halfSize.z, zoneCenter.z + halfSize.z)
+        currentPosition = new Vector3(
+            Mathf.Clamp(currentPosition.x, zoneCenter.x - halfSize.x, zoneCenter.x + halfSize.x),
+            Mathf.Clamp(currentPosition.y, zoneCenter.y - halfSize.y, zoneCenter.y + halfSize.y),
+            Mathf.Clamp(currentPosition.z, zoneCenter.z - halfSize.z, zoneCenter.z + halfSize.z)
         );
 
         // Apply the new direction if we bounced
@@ -176,9 +218,15 @@ public class Moth : NetworkBehaviour
         else if (other.gameObject.layer == LayerMask.NameToLayer("Moth"))
         {
             // Move away from other moth
-            Vector3 awayDirection = (transform.position - other.transform.position).normalized;
-            transform.position += awayDirection * 0.1f;
+            Vector3 awayDirection = (currentPosition - other.transform.position).normalized;
+            currentPosition += awayDirection * 0.1f;
             moveDirection = awayDirection;
+            
+            // Update transform position to match
+            transform.position = currentPosition;
+            
+            // Sync to clients
+            RpcUpdatePositionAndRotation(currentPosition, currentRotation);
         }
     }
 

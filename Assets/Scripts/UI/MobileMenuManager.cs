@@ -249,6 +249,62 @@ public class MobileMenuManager : NetworkBehaviour
 
     #endregion //EndlessRunnerMenu
 
+    #region MothMenu
+
+    [Command(requiresAuthority = false)]
+    public void CmdLoadMothLevel(int level)
+    {
+        Debug.Log($"Loading Moth level: {level}");
+        MothMenuManager mmm = (MothMenuManager)gameMenu;
+        mmm.LoadMothLevel(level);
+    }
+
+    [Command(requiresAuthority = false)]
+    public void CmdRestartMothGame()
+    {
+        Debug.Log("Restarting Moth game");
+        MothMenuManager mmm = (MothMenuManager)gameMenu;
+        mmm.CmdRestartMothGame();
+    }
+    
+    //[Command(requiresAuthority = false)]
+    //public void CmdReplayMothTutorial()
+    //{
+    //    Debug.Log("CmdReplayMothTutorial called in MobileMenuManager");
+    //    MothMenuManager mmm = (MothMenuManager)gameMenu;
+    //    mmm.CmdReplayTutorial();
+    //}
+    
+    // Additional method with no parameters in case Unity isn't showing the others
+    [Command(requiresAuthority = false)]
+    public void LoadMothGame()
+    {
+        Debug.Log("Loading Moth game with default level");
+        MothMenuManager mmm = (MothMenuManager)gameMenu;
+        mmm.LoadMothLevel(1); // Default level
+    }
+    
+    // Simple public methods without Command attribute - these should be visible in Unity inspector
+    public void StartMothGame()
+    {
+        Debug.Log("Starting Moth game");
+        CmdLoadMothLevel(1);
+    }
+    
+    public void RestartMoth()
+    {
+        Debug.Log("Restarting Moth game (simple method)");
+        CmdRestartMothGame();
+    }
+    
+    //public void ReplayMothAudio()
+    //{
+    //    Debug.Log("ReplayMothAudio called (simple method)");
+    //    CmdReplayMothTutorial();
+    //}
+
+    #endregion //MothMenu
+
     #region NewGameMenu
 
     [Command(requiresAuthority = false)]
