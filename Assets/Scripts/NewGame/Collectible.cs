@@ -16,12 +16,23 @@ public class Collectible : NetworkBehaviour
     [Header("Orientation Fix")]
     [SerializeField] private Vector3 initialRotation = new Vector3(0, 180, 0); // Y-axis 180 degrees flip
 
-    private float fallSpeed;
-    private bool isCollected = false;
+    [SyncVar] private float fallSpeed;
+    [SyncVar] private bool isCollected = false;
 
     // For straight falling movement
     private Vector3 startPosition;
-    private float currentY;
+    [SyncVar] private float currentY;
+    
+    private Quaternion currentRotation;
+
+    private void Awake()
+    {
+        // We're going to handle position updates ourselves instead of using NetworkTransform
+        if (TryGetComponent<NetworkTransform>(out var networkTransform))
+        {
+            Destroy(networkTransform);
+        }
+    }
 
     // Method for NewGameManager to set the fall speed
     public void SetFallSpeed(float newSpeed)
@@ -51,9 +62,10 @@ public class Collectible : NetworkBehaviour
         // Store initial X and Z position to maintain straight line movement
         startPosition = transform.position;
         currentY = startPosition.y;
-
+        
         // Fix initial orientation
         transform.rotation = Quaternion.Euler(initialRotation);
+        currentRotation = transform.rotation;
     }
 
     private void Update()
@@ -63,20 +75,38 @@ public class Collectible : NetworkBehaviour
         // Update Y position for straight falling
         currentY -= fallSpeed * Time.deltaTime;
 
-        // Apply position - maintain original X and Z for straight-line falling
-        transform.position = new Vector3(startPosition.x, currentY, startPosition.z);
+        // Create new position - maintain original X and Z for straight-line falling
+        Vector3 newPosition = new Vector3(startPosition.x, currentY, startPosition.z);
 
-        // Apply vertical rotation (around Y axis)
+        // Calculate rotation
         if (rotateOnY)
         {
-            transform.Rotate(0, rotationSpeed * Time.deltaTime, 0, Space.World);
+            // Calculate new rotation
+            currentRotation *= Quaternion.Euler(0, rotationSpeed * Time.deltaTime, 0);
         }
+
+        // Send updated position and rotation to clients
+        RpcUpdatePositionAndRotation(newPosition, currentRotation);
+
+        // Update position and rotation on server
+        transform.position = newPosition;
+        transform.rotation = currentRotation;
 
         // Destroy if it goes out of view
         if (transform.position.y < -10f)
         {
             NetworkServer.Destroy(gameObject);
         }
+    }
+    
+    [ClientRpc]
+    private void RpcUpdatePositionAndRotation(Vector3 newPosition, Quaternion newRotation)
+    {
+        if (isServer) return; // Server already updated position in Update
+        
+        // Apply on clients
+        transform.position = newPosition;
+        transform.rotation = newRotation;
     }
 
     private void OnTriggerEnter(Collider other)

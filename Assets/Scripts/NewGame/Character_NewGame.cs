@@ -19,10 +19,10 @@ public class Character_NewGame : NetworkBehaviour
     [Header("Balloon Rotation Animation")]
     [SerializeField] private float maxTiltAngle = 15f; // Maximum tilt angle
     [SerializeField] private float tiltSpeed = 3f; // How quickly the balloon tilts
-    private float currentTiltAngle = 0f;
+    [SyncVar] private float currentTiltAngle = 0f;
 
     [Header("Gesture Control")]
-    public bool controllingHandIsLeft = false;
+    [SyncVar] public bool controllingHandIsLeft = false;
 
     [Header("Events")]
     public UnityEvent OnHandPositionUpdated;
@@ -31,7 +31,7 @@ public class Character_NewGame : NetworkBehaviour
     private bool canMove = false;
     private Vector3 initialHandPosition;
     private bool isInitialized = false;
-    private float currentSpeed = 0f;
+    [SyncVar] private float currentSpeed = 0f;
     private float targetSpeed = 0f;
     private float lastHandX = 0f;
     private float handOffset = 0f;
@@ -45,8 +45,19 @@ public class Character_NewGame : NetworkBehaviour
     // Rigidbody reference (if any)
     private Rigidbody rb;
 
+    // For position and rotation sync
+    private Vector3 currentPosition;
+    private Quaternion currentRotation;
+
+    // Add NetworkTransform component in Awake if it doesn't exist
     private void Awake()
     {
+        // We're going to handle position updates ourselves instead of using NetworkTransform
+        if (TryGetComponent<NetworkTransform>(out var networkTransform))
+        {
+            Destroy(networkTransform);
+        }
+
         // Store the exact center position
         fixedY = fixedY != 0 ? fixedY : transform.position.y;
         fixedZ = fixedZ != 0 ? fixedZ : transform.position.z;
@@ -63,10 +74,12 @@ public class Character_NewGame : NetworkBehaviour
     private void ForceResetPosition()
     {
         // Reset position to exact center
-        transform.position = centerPosition;
+        currentPosition = centerPosition;
+        transform.position = currentPosition;
 
         // Reset rotation
-        transform.rotation = Quaternion.identity;
+        currentRotation = Quaternion.identity;
+        transform.rotation = currentRotation;
         currentTiltAngle = 0f;
 
         // Reset any physics forces if there's a rigidbody
@@ -76,6 +89,12 @@ public class Character_NewGame : NetworkBehaviour
             rb.angularVelocity = Vector3.zero;
             rb.Sleep(); // Force physics engine to reset completely
         }
+        
+        // Synchronize to clients if we're server
+        if (isServer)
+        {
+            RpcUpdatePositionAndRotation(currentPosition, currentRotation);
+        }
     }
 
     private void Update()
@@ -83,13 +102,13 @@ public class Character_NewGame : NetworkBehaviour
         // Always ensure Y position is fixed, even outside of movement
         if (transform.position.y != fixedY || transform.position.z != fixedZ)
         {
-            Vector3 correctedPosition = transform.position;
-            correctedPosition.y = fixedY;
-            correctedPosition.z = fixedZ;
-            transform.position = correctedPosition;
+            currentPosition = transform.position;
+            currentPosition.y = fixedY;
+            currentPosition.z = fixedZ;
+            transform.position = currentPosition;
         }
 
-        if (!canMove) return;
+        if (!isServer || !canMove) return;
 
         // Debugging log counter
         frameCount++;
@@ -139,14 +158,13 @@ public class Character_NewGame : NetworkBehaviour
         currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, accelRate * Time.deltaTime);
 
         // Apply movement - only on X axis, maintain fixed Y and Z
-        Vector3 newPosition = transform.position;
-        newPosition.x += currentSpeed * Time.deltaTime;
-        newPosition.y = fixedY; // Always maintain fixed Y position
-        newPosition.z = fixedZ; // Always maintain fixed Z position
+        currentPosition = transform.position;
+        currentPosition.x += currentSpeed * Time.deltaTime;
+        currentPosition.y = fixedY; // Always maintain fixed Y position
+        currentPosition.z = fixedZ; // Always maintain fixed Z position
 
         // Clamp to boundaries
-        newPosition.x = Mathf.Clamp(newPosition.x, minX + wallBuffer, maxX - wallBuffer);
-        transform.position = newPosition;
+        currentPosition.x = Mathf.Clamp(currentPosition.x, minX + wallBuffer, maxX - wallBuffer);
 
         // Calculate tilt based on current speed and max speed
         float speedPercent = currentSpeed / maxSpeed;
@@ -156,7 +174,14 @@ public class Character_NewGame : NetworkBehaviour
         currentTiltAngle = Mathf.Lerp(currentTiltAngle, targetTiltAngle, tiltSpeed * Time.deltaTime);
 
         // Apply rotation
-        transform.rotation = Quaternion.Euler(0, 0, currentTiltAngle);
+        currentRotation = Quaternion.Euler(0, 0, currentTiltAngle);
+
+        // Update position and rotation on server
+        transform.position = currentPosition;
+        transform.rotation = currentRotation;
+        
+        // Send updates to clients
+        RpcUpdatePositionAndRotation(currentPosition, currentRotation);
 
         // Log information periodically
         if (shouldLog)
@@ -168,6 +193,16 @@ public class Character_NewGame : NetworkBehaviour
 
         // Trigger event
         OnHandPositionUpdated?.Invoke();
+    }
+    
+    [ClientRpc]
+    private void RpcUpdatePositionAndRotation(Vector3 newPosition, Quaternion newRotation)
+    {
+        if (isServer) return; // Server already updated position in Update
+        
+        // Apply on clients
+        transform.position = newPosition;
+        transform.rotation = newRotation;
     }
 
     // Helper method to get hand position

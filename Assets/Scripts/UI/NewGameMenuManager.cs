@@ -214,4 +214,61 @@ public class NewGameMenuManager : GameMenuManager
             Debug.LogError("NewGameManager is null, cannot switch hands");
         }
     }
+
+    [Command(requiresAuthority = false)]
+    public void CmdReplayTutorial()
+    {
+        if (newGameManager != null)
+        {
+            // Use reflection to access the private fields
+            var audioTutorialField = typeof(NewGameManager).GetField("audioTutorial", 
+                System.Reflection.BindingFlags.Instance | 
+                System.Reflection.BindingFlags.NonPublic | 
+                System.Reflection.BindingFlags.Public);
+                
+            var isCollectionModeField = typeof(NewGameManager).GetField("isCollectionMode", 
+                System.Reflection.BindingFlags.Instance | 
+                System.Reflection.BindingFlags.NonPublic);
+                
+            var awaitingCalibrationField = typeof(NewGameManager).GetField("awaitingCalibration", 
+                System.Reflection.BindingFlags.Instance | 
+                System.Reflection.BindingFlags.NonPublic);
+                
+            if (audioTutorialField != null && isCollectionModeField != null && awaitingCalibrationField != null)
+            {
+                var audioTutorial = audioTutorialField.GetValue(newGameManager);
+                bool isCollectionMode = (bool)isCollectionModeField.GetValue(newGameManager);
+                
+                // Reset awaitingCalibration to true so the game waits for calibration again
+                awaitingCalibrationField.SetValue(newGameManager, true);
+                
+                if (audioTutorial != null)
+                {
+                    // Call the OnGameModeSelected method through reflection
+                    var method = audioTutorial.GetType().GetMethod("OnGameModeSelected");
+                    if (method != null)
+                    {
+                        method.Invoke(audioTutorial, new object[] { isCollectionMode });
+                        Debug.Log("Replaying audio tutorial");
+                    }
+                    else
+                    {
+                        Debug.LogError("OnGameModeSelected method not found on audioTutorial");
+                    }
+                }
+                else
+                {
+                    Debug.LogError("audioTutorial is null, cannot replay tutorial");
+                }
+            }
+            else
+            {
+                Debug.LogError("Could not find required fields using reflection");
+            }
+        }
+        else
+        {
+            Debug.LogError("NewGameManager is null, cannot replay tutorial");
+        }
+    }
 }

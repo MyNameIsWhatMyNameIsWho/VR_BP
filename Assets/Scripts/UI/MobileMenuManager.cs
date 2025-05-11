@@ -64,11 +64,11 @@ public class MobileMenuManager : NetworkBehaviour
         if (isServer) return;
         if (userSelectionUI && !UserSystem.Instance.HasActiveUser) {
             userSelectionUI.SetActive(!userSelectionUI.activeSelf);
-            optionsButtonText.text = userSelectionUI.activeSelf ? "Skrýt" : "Možnosti";
+            optionsButtonText.text = userSelectionUI.activeSelf ? "Skrï¿½t" : "Moï¿½nosti";
         } else {
             hidableUI.SetActive(!hidableUI.activeSelf);
             if (gestureSettingsUI) gestureSettingsUI.SetActive(false);
-            optionsButtonText.text = hidableUI.activeSelf ? "Skrýt" : "Možnosti";
+            optionsButtonText.text = hidableUI.activeSelf ? "Skrï¿½t" : "Moï¿½nosti";
         }
     }
 
@@ -97,7 +97,7 @@ public class MobileMenuManager : NetworkBehaviour
     {
         mainMenu.LoadMiniGame(game);
         hidableUI.SetActive(false);
-        optionsButtonText.text = "Možnosti";
+        optionsButtonText.text = "Moï¿½nosti";
     }
 
     public void ChangeGestureSettingsMenuVisibility()
@@ -248,4 +248,57 @@ public class MobileMenuManager : NetworkBehaviour
     }
 
     #endregion //EndlessRunnerMenu
+
+    #region NewGameMenu
+
+    [Command(requiresAuthority = false)]
+    public void CmdLoadCollectibleLevel(int level)
+    {
+        NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+        ngmm.LoadCollectibleLevel(level);
+    }
+
+    [Command(requiresAuthority = false)]
+    public void CmdLoadObstacleLevelSlow(int level)
+    {
+        NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+        ngmm.LoadObstacleLevelSlow(level);
+    }
+
+    [Command(requiresAuthority = false)]
+    public void CmdLoadObstacleLevelMedium(int level)
+    {
+        NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+        ngmm.LoadObstacleLevelMedium(level);
+    }
+
+    [Command(requiresAuthority = false)]
+    public void CmdLoadObstacleLevelFast(int level)
+    {
+        NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+        ngmm.LoadObstacleLevelFast(level);
+    }
+
+    // [Command(requiresAuthority = false)]
+    // public void CmdResetNewGame()
+    // {
+    //     NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+    //     ngmm.CmdResetNewGame();
+    // }
+
+    // [Command(requiresAuthority = false)]
+    // public void CmdSwitchHandsNewGame()
+    // {
+    //     NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+    //     ngmm.CmdSwitchHands();
+    // }
+
+    [Command(requiresAuthority = false)]
+    public void CmdReplayTutorial()
+    {
+        NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
+        ngmm.CmdReplayTutorial();
+    }
+
+    #endregion //NewGameMenu
 }

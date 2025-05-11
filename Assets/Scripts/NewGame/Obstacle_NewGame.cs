@@ -5,8 +5,8 @@ using System.Collections;
 public class Obstacle_NewGame : NetworkBehaviour
 {
     // Original obstacle properties
-    private float fallSpeed;
-    private bool hasCollided = false;
+    [SyncVar] private float fallSpeed;
+    [SyncVar] private bool hasCollided = false;
 
     // Added rotation properties
     [Header("Rotation Settings")]
@@ -21,7 +21,18 @@ public class Obstacle_NewGame : NetworkBehaviour
 
     // For straight falling movement
     private Vector3 startPosition;
-    private float currentY;
+    [SyncVar] private float currentY;
+    
+    private Quaternion currentRotation;
+
+    private void Awake()
+    {
+        // We're going to handle position updates ourselves instead of using NetworkTransform
+        if (TryGetComponent<NetworkTransform>(out var networkTransform))
+        {
+            Destroy(networkTransform);
+        }
+    }
 
     public void Initialize()
     {
@@ -39,6 +50,7 @@ public class Obstacle_NewGame : NetworkBehaviour
         // Store initial X and Z position to maintain straight line movement
         startPosition = transform.position;
         currentY = startPosition.y;
+        currentRotation = transform.rotation;
 
         // Make sure this doesn't push other objects
         Rigidbody rb = GetComponent<Rigidbody>();
@@ -55,10 +67,10 @@ public class Obstacle_NewGame : NetworkBehaviour
         // Update Y position for straight falling
         currentY -= fallSpeed * Time.deltaTime;
 
-        // Apply position - maintain original X and Z for straight-line falling
-        transform.position = new Vector3(startPosition.x, currentY, startPosition.z);
+        // Create new position - maintain original X and Z for straight-line falling
+        Vector3 newPosition = new Vector3(startPosition.x, currentY, startPosition.z);
 
-        // Apply rotation if enabled (only affects visual rotation, not movement)
+        // Calculate rotation if enabled
         if (enableRotation)
         {
             // Simple rotation on specified axes
@@ -66,14 +78,32 @@ public class Obstacle_NewGame : NetworkBehaviour
             float yRotation = rotateY ? rotationSpeed * Time.deltaTime : 0;
             float zRotation = rotateZ ? rotationSpeed * Time.deltaTime : 0;
 
-            transform.Rotate(xRotation, yRotation, zRotation, Space.Self);
+            // Calculate new rotation
+            currentRotation *= Quaternion.Euler(xRotation, yRotation, zRotation);
         }
+
+        // Send updated position and rotation to clients
+        RpcUpdatePositionAndRotation(newPosition, currentRotation);
+
+        // Update position and rotation on server
+        transform.position = newPosition;
+        transform.rotation = currentRotation;
 
         // Destroy if it goes out of view
         if (transform.position.y < -10f)
         {
             NetworkServer.Destroy(gameObject);
         }
+    }
+
+    [ClientRpc]
+    private void RpcUpdatePositionAndRotation(Vector3 newPosition, Quaternion newRotation)
+    {
+        if (isServer) return; // Server already updated position in Update
+        
+        // Apply on clients
+        transform.position = newPosition;
+        transform.rotation = newRotation;
     }
 
     private void OnCollisionEnter(Collision collision)
