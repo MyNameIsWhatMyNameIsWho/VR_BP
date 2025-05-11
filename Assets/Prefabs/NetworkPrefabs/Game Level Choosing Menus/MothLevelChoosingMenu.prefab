@@ -909,7 +909,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8835176020077165633
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1822,7 +1822,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Jednou rukou
+  m_text: Play game
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: af4b1194e9cd4b547b9c6fe137884dfc, type: 2}
   m_sharedMaterial: {fileID: 1327729394593832536, guid: af4b1194e9cd4b547b9c6fe137884dfc, type: 2}
@@ -1849,7 +1849,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 37.95
+  m_fontSize: 44.5
   m_fontSizeBase: 24
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -2354,7 +2354,7 @@ GameObject:
   - component: {fileID: 4629953892504204354}
   - component: {fileID: 7039019526257461469}
   m_Layer: 0
-  m_Name: OneHandedGestureGameButton
+  m_Name: PlayButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

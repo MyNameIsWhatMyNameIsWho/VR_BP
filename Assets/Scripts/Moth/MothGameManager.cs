@@ -31,6 +31,7 @@ public class MothGameManager : NetworkBehaviour
     [SerializeField] private TextMeshPro timeText;
     [SerializeField] private TextMeshPro finalScoreText;
     [SerializeField] private TextMeshPro highScoreText;
+    [SerializeField] private TextMeshPro comboText; // Text to display combo information
     [SerializeField] private NetworkVisualEffect successEffect;
 
     // Color combo system
@@ -134,6 +135,12 @@ public class MothGameManager : NetworkBehaviour
     if (endgameInfo != null)
     {
         endgameInfo.SetActive(false);
+    }
+    
+    // Initialize combo text
+    if (comboText != null)
+    {
+        comboText.text = "";
     }
 
     if (!isServer) return;
@@ -250,6 +257,12 @@ public class MothGameManager : NetworkBehaviour
         {
             timeText.gameObject.SetActive(false);
         }
+        
+        // Clear combo display
+        if (comboText != null)
+        {
+            comboText.text = "";
+        }
 
         // Clean up active moths
         foreach (var moth in activeMoths)
@@ -340,6 +353,12 @@ public class MothGameManager : NetworkBehaviour
         gameRunning = true;
         mothsInteractive = false;  // Start with moths not interactive
         isWaitingForRespawn = false;
+        
+        // Clear combo display
+        if (comboText != null)
+        {
+            comboText.text = "";
+        }
 
         // Reset combo tracking if available
         if (enableColorCombos && colorComboManager != null)
@@ -488,17 +507,35 @@ public class MothGameManager : NetworkBehaviour
         {
             // Process the caught moth in the combo system
             int bonusPoints = colorComboManager.ProcessCaughtMoth(moth.MothColor);
-
-            // Add any bonus points from combos
+            
+            // If bonus points were awarded, show success message, otherwise update regular display
             if (bonusPoints > 0)
             {
-                pointsToAdd += bonusPoints;
+                // Combo was completed, show success with bonus info
+                (Color comboColor, int comboCount) = colorComboManager.GetLastCompletedComboInfo();
+                
+                // Get the time bonus calculation - matching the logic in MothColorCombo
+                float minComboLength = 2; // Minimum combo length to get any reward (hardcoded to match MothColorCombo default)
+                float baseTimeReward = 3.0f; // Base time reward for minimum combo (hardcoded to match MothColorCombo default)
+                float additionalTimePerCombo = 2.0f; // Additional time per extra moth (hardcoded to match MothColorCombo default)
+                float timeBonus = baseTimeReward + (additionalTimePerCombo * (comboCount - minComboLength));
+                
+                DisplayComboSuccess(comboCount, comboColor, bonusPoints, timeBonus);
+                
                 // Visual/audio feedback for combo bonus
                 if (successEffect != null)
                 {
                     PlayEffectAtPosition(moth.transform.position, true);
                 }
             }
+            else
+            {
+                // Just update the normal combo display
+                UpdateComboDisplay();
+            }
+            
+            // Add any bonus points from combos
+            pointsToAdd += bonusPoints;
         }
 
         // Add score
@@ -727,11 +764,110 @@ public class MothGameManager : NetworkBehaviour
                 NetworkServer.Destroy(moth);
         }
         activeMoths.Clear();
+        
+        // Clear combo display
+        if (comboText != null)
+        {
+            comboText.text = "";
+        }
     }
 
     // Check if game is currently running
     public bool IsGameRunning()
     {
         return gameRunning;
+    }
+
+    // Update the combo display text with the current combo information
+    private void UpdateComboDisplay()
+    {
+        if (comboText == null || !enableColorCombos || colorComboManager == null) return;
+
+        // Get current combo info
+        (Color color, int count) = colorComboManager.GetCurrentComboInfo();
+        
+        // Only show if combo count is at least 1
+        if (count <= 0)
+        {
+            comboText.text = "";
+            return;
+        }
+        
+        // Get color name in Czech
+        string czechColorName = GetCzechColorName(color);
+        
+        // Set the text with the color name and count
+        comboText.text = $"{czechColorName} x{count}";
+        
+        // Set the text color to match the moth color
+        comboText.color = color;
+    }
+    
+    // Convert color to Czech name
+    private string GetCzechColorName(Color color)
+    {
+        // Find the closest predefined color and return Czech name
+        if (colorComboManager == null) return "neznámý";
+        
+        // Get closest color index
+        int colorIndex = GetClosestColorIndex(color);
+        
+        // Return appropriate Czech name
+        switch (colorIndex)
+        {
+            case 0: return "červený";
+            case 1: return "zelený";
+            case 2: return "modrý";
+            case 3: return "žlutý";
+            case 4: return "fialový";
+            default: return "neznámý";
+        }
+    }
+    
+    // Get index of closest color
+    private int GetClosestColorIndex(Color color)
+    {
+        // For simplicity, we'll use a basic approach to identify the color
+        if (color.r > 0.7f && color.g < 0.5f && color.b < 0.5f) return 0; // Red
+        if (color.r < 0.5f && color.g > 0.7f && color.b < 0.5f) return 1; // Green
+        if (color.r < 0.5f && color.g < 0.5f && color.b > 0.7f) return 2; // Blue
+        if (color.r > 0.7f && color.g > 0.7f && color.b < 0.5f) return 3; // Yellow
+        if (color.r > 0.7f && color.g < 0.5f && color.b > 0.7f) return 4; // Purple
+        return 0; // Default to red
+    }
+
+    // Display a success message when a combo is completed
+    private void DisplayComboSuccess(int comboCount, Color color, int points, float timeBonus)
+    {
+        if (comboText == null) return;
+        
+        string czechColorName = GetCzechColorName(color);
+        
+        // Show success message with points and time bonus
+        StartCoroutine(ShowComboSuccessMessage(czechColorName, comboCount, points, timeBonus));
+    }
+    
+    // Coroutine to show the combo success message for a few seconds
+    private IEnumerator ShowComboSuccessMessage(string colorName, int count, int points, float timeBonus)
+    {
+        if (comboText == null) yield break;
+        
+        // Cache original font size and color
+        float originalFontSize = comboText.fontSize;
+        Color originalColor = comboText.color;
+        
+        // // Show simplified success message with larger font
+        // comboText.fontSize = originalFontSize * 1.5f;
+        comboText.color = Color.yellow;
+        comboText.text = $"COMBO! +{points}";
+        
+        // Wait for display time
+        yield return new WaitForSeconds(1.5f);
+        
+        // Reset font size and get current combo to display after
+        //comboText.fontSize = originalFontSize;
+        
+        // Update the regular combo display again
+        UpdateComboDisplay();
     }
 }
