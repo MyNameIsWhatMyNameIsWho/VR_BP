@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Mirror;
-using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Manages the audio tutorial for new users in the main menu.
@@ -70,34 +69,6 @@ public class MainMenuAudioTutorial : NetworkBehaviour
 
         audioSource.playOnAwake = false;
         audioSource.loop = false;
-        
-        // Don't destroy when loading new scenes if playing the tutorial completed audio
-        // This ensures the audio finishes playing even when transitioning to a new scene
-        SceneManager.sceneLoaded += OnSceneLoaded;
-    }
-
-    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        // If we're playing the tutorial completed audio, make this object persist
-        if (IsTutorialCompletedAudioPlaying())
-        {
-            DontDestroyOnLoad(gameObject);
-            
-            // Set a timer to destroy this object after audio is done
-            StartCoroutine(DestroyAfterAudio());
-        }
-    }
-    
-    private IEnumerator DestroyAfterAudio()
-    {
-        // Wait until audio finishes playing
-        yield return new WaitUntil(() => !audioSource.isPlaying);
-        
-        // Add a small delay to ensure it completes properly
-        yield return new WaitForSeconds(0.5f);
-        
-        // Destroy the object
-        Destroy(gameObject);
     }
 
     // Static flag to track if tutorial has played in this session
@@ -162,9 +133,6 @@ public class MainMenuAudioTutorial : NetworkBehaviour
         {
             StopCoroutine(activeCoroutine);
         }
-        
-        // Unsubscribe from scene loaded event
-        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
     private IEnumerator StartTutorialSequence()
@@ -294,13 +262,8 @@ public class MainMenuAudioTutorial : NetworkBehaviour
         isWaitingForGesture = false;
 
         // Play final message
-        Debug.Log("Rock gesture completed, playing final tutorial message");
         PlayAudioClipServerRpc(6); // tutorialCompletedClip
-        
-        // Mark tutorial as completed - even if the audio might be interrupted by scene change
-        PlayerPrefs.SetInt(TUTORIAL_COMPLETED_KEY, 1);
-        PlayerPrefs.Save();
-        
+
         Debug.Log("Tutorial completed");
     }
 
@@ -349,21 +312,8 @@ public class MainMenuAudioTutorial : NetworkBehaviour
         }
     }
 
-    // Check if we're waiting for the rock gesture (used by VRButton)
-    public bool IsWaitingForRockGesture()
-    {
-        return currentState == TutorialState.WaitingForRockGesture;
-    }
-    
-    // Check if tutorial completion audio is currently playing
-    public bool IsTutorialCompletedAudioPlaying()
-    {
-        return audioSource != null && 
-               audioSource.isPlaying && 
-               audioSource.clip == tutorialCompletedClip;
-    }
-
     // Play audio by index instead of passing AudioClip objects
+    // This avoids Mirror's serialization issues with AudioClip
     private void PlayAudioClip(int clipIndex)
     {
         AudioClip clip = GetAudioClipByIndex(clipIndex);

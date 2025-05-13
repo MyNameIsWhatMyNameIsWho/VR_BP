@@ -27,10 +27,6 @@ public class MothColorCombo : MonoBehaviour
     private Color currentComboColor;
     private int comboCount = 0;
     private bool isComboActive = false;
-    
-    // For tracking last completed combo
-    private Color lastCompletedComboColor;
-    private int lastCompletedComboCount = 0;
 
     // Reference to main game manager
     private MothGameManager gameManager;
@@ -71,10 +67,6 @@ public class MothColorCombo : MonoBehaviour
                 // Calculate rewards - progressively increasing with combo length
                 float timeReward = baseTimeReward + (additionalTimePerCombo * (comboCount - minComboLength));
                 bonusPoints = Mathf.RoundToInt(pointsPerCombo * comboCount);
-                
-                // Store the last completed combo info
-                lastCompletedComboColor = currentComboColor;
-                lastCompletedComboCount = comboCount;
 
                 if (showDebugMessages)
                 {
@@ -196,13 +188,5 @@ public class MothColorCombo : MonoBehaviour
     public (Color color, int count) GetCurrentComboInfo()
     {
         return (currentComboColor, comboCount);
-    }
-    
-    /// <summary>
-    /// Get information about the last completed combo
-    /// </summary>
-    public (Color color, int count) GetLastCompletedComboInfo()
-    {
-        return (lastCompletedComboColor, lastCompletedComboCount);
     }
 }
