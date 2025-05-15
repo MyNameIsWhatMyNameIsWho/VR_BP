@@ -34,12 +34,12 @@ public class MobileMenuManager : NetworkBehaviour
     void Start()
     {
         mainMenu = transform.parent.GetComponent<MainMenuManager>();
-       // gameMenu = transform.parent.GetComponent<GameMenuManager>();
+        // gameMenu = transform.parent.GetComponent<GameMenuManager>();
 
         hidableUI.SetActive(false);
         if (gestureSettingsUI) gestureSettingsUI.SetActive(false);
         if (userSelectionUI) userSelectionUI.SetActive(false);
-        
+
         if (gameMenu is TangramLevelMenuManager)
         {
             (gameMenu as TangramLevelMenuManager).OnModeChange.AddListener(modeToggle.SetIsOnWithoutNotify);
@@ -62,13 +62,16 @@ public class MobileMenuManager : NetworkBehaviour
     public void ChangeMobileUIVisibility()
     {
         if (isServer) return;
-        if (userSelectionUI && !UserSystem.Instance.HasActiveUser) {
+        if (userSelectionUI && !UserSystem.Instance.HasActiveUser)
+        {
             userSelectionUI.SetActive(!userSelectionUI.activeSelf);
-            optionsButtonText.text = userSelectionUI.activeSelf ? "Skr�t" : "Mo�nosti";
-        } else {
+            optionsButtonText.text = userSelectionUI.activeSelf ? "Skrýt" : "Možnosti";
+        }
+        else
+        {
             hidableUI.SetActive(!hidableUI.activeSelf);
             if (gestureSettingsUI) gestureSettingsUI.SetActive(false);
-            optionsButtonText.text = hidableUI.activeSelf ? "Skr�t" : "Mo�nosti";
+            optionsButtonText.text = hidableUI.activeSelf ? "Skrýt" : "Možnosti";
         }
     }
 
@@ -97,7 +100,7 @@ public class MobileMenuManager : NetworkBehaviour
     {
         mainMenu.LoadMiniGame(game);
         hidableUI.SetActive(false);
-        optionsButtonText.text = "Mo�nosti";
+        optionsButtonText.text = "Možnosti";
     }
 
     public void ChangeGestureSettingsMenuVisibility()
@@ -110,7 +113,8 @@ public class MobileMenuManager : NetworkBehaviour
     /// <summary>
     /// Removes a user with a nickname matching the text in the input field (if exists and is not DefaultUser).
     /// </summary>
-    public void RemoveUser() {
+    public void RemoveUser()
+    {
         if (userNicknameInput.text == "DefaultUser")
         {
             Debug.LogWarning("Removing DefaultUser forbidden.");
@@ -118,7 +122,8 @@ public class MobileMenuManager : NetworkBehaviour
             return;
         }
 
-        if (ButtonTexts.Exists((t) => t.transform.parent.gameObject.activeSelf && t.text == userNicknameInput.text)) { 
+        if (ButtonTexts.Exists((t) => t.transform.parent.gameObject.activeSelf && t.text == userNicknameInput.text))
+        {
             UserSystem.Instance.RemoveUser(userNicknameInput.text);
             userNicknameInput.text = string.Empty;
             return;
@@ -140,7 +145,8 @@ public class MobileMenuManager : NetworkBehaviour
     /// </summary>
     /// <param name="show">True to show, false to hide.</param>
     [ClientRpc]
-    public void RpcShowUserSelection(bool show) {
+    public void RpcShowUserSelection(bool show)
+    {
         Debug.LogWarning($"Show user selection {show}");
         if (show)
         {
@@ -148,7 +154,8 @@ public class MobileMenuManager : NetworkBehaviour
             hidableUI.SetActive(false);
             gestureSettingsUI.SetActive(false);
         }
-        else {
+        else
+        {
             userSelectionUI.SetActive(false);
             hidableUI.SetActive(true);
             gestureSettingsUI.SetActive(false);
@@ -161,18 +168,21 @@ public class MobileMenuManager : NetworkBehaviour
     /// </summary>
     public void AddUser()
     {
-        if (ButtonTexts.Exists((t) => t.transform.parent.gameObject.activeSelf && t.text == userNicknameInput.text)) return;        
-        
+        if (ButtonTexts.Exists((t) => t.transform.parent.gameObject.activeSelf && t.text == userNicknameInput.text)) return;
+
         UserSystem.Instance.CreateUser(userNicknameInput.text);
         userNicknameInput.text = string.Empty;
         addButton.interactable = false;
     }
 
 
-    public void EnableAddUserButton(bool error) {
-        if (error) {
+    public void EnableAddUserButton(bool error)
+    {
+        if (error)
+        {
             StartCoroutine(ShowError(addButton.interactable ? 0 : 1));
-        } else
+        }
+        else
         {
             addButton.interactable = true;
         }
@@ -183,7 +193,8 @@ public class MobileMenuManager : NetworkBehaviour
     /// </summary>
     /// <param name="i">Index of the error text in SerializeField list.</param>
     /// <returns>Coroutine</returns>
-    IEnumerator ShowError(int i) {
+    IEnumerator ShowError(int i)
+    {
         errorTexts[i].SetActive(true);
         yield return new WaitForSeconds(1);
         addButton.interactable = true;
@@ -223,7 +234,8 @@ public class MobileMenuManager : NetworkBehaviour
     [Command(requiresAuthority = false)]
     public void CmdChangeTangramMode(bool autoSnapping)
     {
-        if (gameMenu is TangramLevelMenuManager) { 
+        if (gameMenu is TangramLevelMenuManager)
+        {
             (gameMenu as TangramLevelMenuManager).SwapAutoSnapping();
         }
         //gameMenu.ChangeTangramMode(autoSnapping);
@@ -264,6 +276,7 @@ public class MobileMenuManager : NetworkBehaviour
         if (gameMenu is MothMenuManager)
         {
             MothMenuManager mmm = (MothMenuManager)gameMenu;
+            // This will run on the server and then propagate to all clients via ClientRpc
             mmm.LoadMothLevel(level);
         }
         else
@@ -285,6 +298,7 @@ public class MobileMenuManager : NetworkBehaviour
         if (gameMenu is MothMenuManager)
         {
             MothMenuManager mmm = (MothMenuManager)gameMenu;
+            // This will run the CmdRestartMothGame command on the server
             mmm.CmdRestartMothGame();
         }
         else
@@ -292,31 +306,25 @@ public class MobileMenuManager : NetworkBehaviour
             Debug.LogError($"Expected gameMenu to be MothMenuManager but was {gameMenu.GetType().Name}");
         }
     }
-    
-    //[Command(requiresAuthority = false)]
-    //public void CmdReplayMothTutorial()
-    //{
-    //    Debug.Log("CmdReplayMothTutorial called in MobileMenuManager");
-    //    MothMenuManager mmm = (MothMenuManager)gameMenu;
-    //    mmm.CmdReplayTutorial();
-    //}
-    
-    // Additional method with no parameters in case Unity isn't showing the others
+
+    // Optional tutorial replay functionality
+    /*
     [Command(requiresAuthority = false)]
-    public void LoadMothGame()
+    public void CmdReplayMothTutorial()
     {
-        Debug.Log("Loading Moth game with default level");
+        Debug.Log("CmdReplayMothTutorial called in MobileMenuManager");
         if (gameMenu is MothMenuManager)
         {
             MothMenuManager mmm = (MothMenuManager)gameMenu;
-            mmm.LoadMothLevel(1); // Default level
+            mmm.CmdReplayTutorial();
         }
         else
         {
             Debug.LogError("Expected gameMenu to be MothMenuManager but was " + gameMenu.GetType().Name);
         }
     }
-    
+    */
+
     // Simple public methods without Command attribute - these should be visible in Unity inspector
     public void StartMothGame()
     {
@@ -330,18 +338,12 @@ public class MobileMenuManager : NetworkBehaviour
             Debug.LogError("Expected gameMenu to be MothMenuManager but was " + gameMenu.GetType().Name);
         }
     }
-    
+
     public void RestartMoth()
     {
         Debug.Log("Restarting Moth game (simple method)");
         CmdRestartMothGame();
     }
-    
-    //public void ReplayMothAudio()
-    //{
-    //    Debug.Log("ReplayMothAudio called (simple method)");
-    //    CmdReplayMothTutorial();
-    //}
 
     #endregion //MothMenu
 
@@ -374,20 +376,6 @@ public class MobileMenuManager : NetworkBehaviour
         NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
         ngmm.LoadObstacleLevelFast(level);
     }
-
-    // [Command(requiresAuthority = false)]
-    // public void CmdResetNewGame()
-    // {
-    //     NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
-    //     ngmm.CmdResetNewGame();
-    // }
-
-    // [Command(requiresAuthority = false)]
-    // public void CmdSwitchHandsNewGame()
-    // {
-    //     NewGameMenuManager ngmm = (NewGameMenuManager)gameMenu;
-    //     ngmm.CmdSwitchHands();
-    // }
 
     [Command(requiresAuthority = false)]
     public void CmdReplayTutorial()

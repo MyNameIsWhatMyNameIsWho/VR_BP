@@ -22,13 +22,14 @@ public class Moth : NetworkBehaviour
     private bool isActive = true;
 
     // Color of this moth - primarily for combo tracking
-    [SyncVar] private Color mothColor;
+    [SyncVar(hook = nameof(OnColorChanged))]
+    private Color mothColor;
     public Color MothColor => mothColor;
 
     // For position and rotation sync
     private Vector3 currentPosition;
     private Quaternion currentRotation;
-    
+
     // Sync update frequency
     private float customSyncInterval = 0.05f; // Renamed from syncInterval
     private float lastCustomSyncTime = 0f;    // Renamed from lastSyncTime
@@ -43,13 +44,24 @@ public class Moth : NetworkBehaviour
         {
             Destroy(networkTransform);
         }
+
+        // Cache renderer reference
+        meshRenderer = GetComponent<MeshRenderer>();
+    }
+
+    // Called when the color SyncVar changes
+    void OnColorChanged(Color oldColor, Color newColor)
+    {
+        // Apply the new color to the renderer
+        if (meshRenderer != null && meshRenderer.material != null)
+        {
+            meshRenderer.material.color = newColor;
+            Debug.Log($"Moth color changed to: {ColorToName(newColor)}");
+        }
     }
 
     public void Initialize(Color? colorOverride = null)
     {
-        // Cache renderer reference
-        meshRenderer = GetComponent<MeshRenderer>();
-
         // Set color (either from provided value or from color manager)
         if (colorOverride.HasValue)
         {
@@ -73,7 +85,7 @@ public class Moth : NetworkBehaviour
             Debug.Log("Using fallback random color for moth");
         }
 
-        // Apply color to renderer
+        // Apply color to renderer (will happen immediately on server, and through SyncVar on clients)
         if (meshRenderer != null && meshRenderer.material != null)
         {
             meshRenderer.material.color = mothColor;
@@ -96,7 +108,7 @@ public class Moth : NetworkBehaviour
             collider.isTrigger = true;
             collider.radius = 0.3f;
         }
-        
+
         // Initialize position and rotation sync variables
         currentPosition = transform.position;
         currentRotation = transform.rotation;
@@ -127,11 +139,11 @@ public class Moth : NetworkBehaviour
 
         // Add some rotation for visual interest
         currentRotation *= Quaternion.Euler(0, Time.deltaTime * 90f, 0);
-        
+
         // Apply position and rotation to server object
         transform.position = currentPosition;
         transform.rotation = currentRotation;
-        
+
         // Sync position and rotation to clients at regular intervals
         if (Time.time - lastCustomSyncTime > customSyncInterval)
         {
@@ -139,12 +151,12 @@ public class Moth : NetworkBehaviour
             lastCustomSyncTime = Time.time;
         }
     }
-    
+
     [ClientRpc]
     private void RpcUpdatePositionAndRotation(Vector3 newPosition, Quaternion newRotation)
     {
         if (isServer) return; // Server already updated in Update
-        
+
         // Apply position and rotation on clients
         transform.position = newPosition;
         transform.rotation = newRotation;
@@ -221,10 +233,10 @@ public class Moth : NetworkBehaviour
             Vector3 awayDirection = (currentPosition - other.transform.position).normalized;
             currentPosition += awayDirection * 0.1f;
             moveDirection = awayDirection;
-            
+
             // Update transform position to match
             transform.position = currentPosition;
-            
+
             // Sync to clients
             RpcUpdatePositionAndRotation(currentPosition, currentRotation);
         }

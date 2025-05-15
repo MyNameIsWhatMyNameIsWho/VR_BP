@@ -25,7 +25,11 @@ public class MothColorCombo : MonoBehaviour
     [SerializeField] private bool showDebugMessages = true;        // Whether to show debug messages
 
     [Header("UI")]
-    [SerializeField] private TextMeshPro comboDisplayText; // Changed from TextMeshProUGUI to TextMeshPro
+    [SerializeField] private TextMeshPro comboDisplayText; // TextMeshPro component for combo display
+
+    // World space canvas for combo display (add this as alternative display method)
+    [SerializeField] private Canvas comboWorldCanvas;
+    [SerializeField] private TextMeshProUGUI comboCanvasText;
 
     // Combo tracking
     private Color currentComboColor;
@@ -42,13 +46,38 @@ public class MothColorCombo : MonoBehaviour
         {
             Debug.LogError("MothGameManager not found!");
         }
+
+        // Initialize text displays
+        InitializeTextDisplays();
+    }
+
+    private void InitializeTextDisplays()
+    {
+        // Check if we have the TextMeshPro component
         if (comboDisplayText == null)
         {
-            Debug.LogWarning("Combo Display Text not assigned in the inspector!");
+            Debug.LogWarning("Combo Display TextMeshPro not assigned in the inspector!");
         }
         else
         {
             comboDisplayText.text = ""; // Initialize text
+        }
+
+        // Check if we have the Canvas Text component
+        if (comboCanvasText == null)
+        {
+            Debug.LogWarning("Combo Canvas Text not assigned in the inspector!");
+        }
+        else
+        {
+            comboCanvasText.text = ""; // Initialize text
+        }
+
+        // Ensure Canvas is set to face the camera on clients
+        if (comboWorldCanvas != null)
+        {
+            comboWorldCanvas.renderMode = RenderMode.WorldSpace;
+            // We should ensure it faces the camera, on clients this should be set during runtime
         }
     }
 
@@ -75,7 +104,7 @@ public class MothColorCombo : MonoBehaviour
         if (!isComboActive || !ColorMatches(mothColor, currentComboColor))
         {
             // Store details of the combo that might be ending
-            Color previousActiveComboColor = currentComboColor; 
+            Color previousActiveComboColor = currentComboColor;
             string previousActiveComboColorName = isComboActive ? ColorToName(previousActiveComboColor) : "None";
 
             // If there was an active combo, try to complete it
@@ -90,11 +119,8 @@ public class MothColorCombo : MonoBehaviour
                              $"Awarding {timeReward:F1}s and {bonusPoints} points");
                 }
 
-                if (comboDisplayText != null)
-                {
-                    comboDisplayText.text = $"KOMBO! +{bonusPoints} bodů";
-                    comboDisplayText.color = Color.yellow; // Set KOMBO! text color to yellow
-                }
+                // Update both text displays with the combo message
+                UpdateComboText($"KOMBO! +{bonusPoints} bodů", Color.yellow);
                 comboAwardedThisCatch = true;
 
                 if (gameManager != null)
@@ -110,10 +136,8 @@ public class MothColorCombo : MonoBehaviour
                     Debug.Log($"Combo too short: {comboCount}x {previousActiveComboColorName} " +
                              $"(min {minComboLength} needed)");
                 }
-                if (comboDisplayText != null)
-                {
-                    comboDisplayText.text = ""; // Clear text for short/broken combo
-                }
+                // Clear text for short/broken combo
+                UpdateComboText("", Color.white);
             }
 
             // Start new combo with the newly caught moth
@@ -129,16 +153,12 @@ public class MothColorCombo : MonoBehaviour
             // Update display text:
             // If a combo was just awarded, the "KOMBO!" message is already shown and should persist.
             // Otherwise, show the start of the new combo.
-            if (comboDisplayText != null)
+            if (!comboAwardedThisCatch)
             {
-                if (!comboAwardedThisCatch)
-                {
-                    comboDisplayText.text = $"{newMothColorName} x{comboCount}";
-                    comboDisplayText.color = currentComboColor; // This is the new moth's color
-                }
-                // If comboAwardedThisCatch is true, the text is already "KOMBO!" with the previous combo's color.
-                // It will be updated by the next moth catch.
+                UpdateComboText($"{newMothColorName} x{comboCount}", currentComboColor);
             }
+            // If comboAwardedThisCatch is true, the text is already "KOMBO!" with the previous combo's color.
+            // It will be updated by the next moth catch.
         }
         // Case 2: Same color as current combo (continuing existing combo)
         else
@@ -148,13 +168,29 @@ public class MothColorCombo : MonoBehaviour
             {
                 Debug.Log($"COMBO CONTINUED: {newMothColorName} ({comboCount})");
             }
-            if (comboDisplayText != null)
-            {
-                comboDisplayText.text = $"{newMothColorName} x{comboCount}";
-                comboDisplayText.color = currentComboColor; 
-            }
+            UpdateComboText($"{newMothColorName} x{comboCount}", currentComboColor);
         }
         return bonusPoints;
+    }
+
+    /// <summary>
+    /// Update both the TextMeshPro and Canvas text displays
+    /// </summary>
+    private void UpdateComboText(string text, Color color)
+    {
+        // Update TextMeshPro if available
+        if (comboDisplayText != null)
+        {
+            comboDisplayText.text = text;
+            comboDisplayText.color = color;
+        }
+
+        // Update Canvas Text if available (for mobile)
+        if (comboCanvasText != null)
+        {
+            comboCanvasText.text = text;
+            comboCanvasText.color = color;
+        }
     }
 
     /// <summary>
@@ -180,10 +216,9 @@ public class MothColorCombo : MonoBehaviour
         {
             Debug.Log("COMBO SYSTEM RESET");
         }
-        if (comboDisplayText != null)
-        {
-            comboDisplayText.text = ""; // Clear UI text on reset
-        }
+
+        // Clear both text displays
+        UpdateComboText("", Color.white);
     }
 
     /// <summary>

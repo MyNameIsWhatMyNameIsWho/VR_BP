@@ -2,17 +2,18 @@ using Mirror;
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// Menu manager for the Moth Game - handles level loading and auto-starts the game
-/// </summary>
 public class MothMenuManager : GameMenuManager
 {
     private MothGameManager mothGameManager;
 
-    // Public method to be called by UI button - loads and immediately starts the game
+    // Modified to use ClientRpc like other game managers do
+    [ClientRpc]
     public void LoadMothLevel(int level)
     {
+        // Call the base method to handle instantiating the level prefab
         base.LoadLevel(level);
+        
+        // Start coroutine to wait for level to load and then start the game
         StartCoroutine(StartGameImmediately());
     }
 
@@ -21,6 +22,7 @@ public class MothMenuManager : GameMenuManager
         // Wait until the level is loaded
         float timeout = 5f;
         float elapsed = 0f;
+        
         while (currentlyPlayedLevel == null && elapsed < timeout)
         {
             yield return new WaitForSeconds(0.1f);
@@ -41,7 +43,6 @@ public class MothMenuManager : GameMenuManager
             // Manually set up the UI state we want:
             // - Hide initial menu buttons
             // - Show in-game button (back to menu)
-            // This mimics what happens in OnGameStart but we do it manually before starting
             if (mothGameManager.initialButtons != null)
             {
                 mothGameManager.initialButtons.SetActive(false);
@@ -61,29 +62,46 @@ public class MothMenuManager : GameMenuManager
         }
     }
 
+    // This method is correct - it's a Command that will run on the server
     [Command(requiresAuthority = false)]
     public void CmdRestartMothGame()
     {
+        // Make sure mothGameManager is found and valid
+        if (mothGameManager == null && currentlyPlayedLevel != null)
+        {
+            // Try to get the reference if it's null but we have a level
+            mothGameManager = currentlyPlayedLevel.GetComponent<MothGameManager>();
+        }
+        
+        // Call RestartGame on the MothGameManager
         if (mothGameManager != null)
         {
             mothGameManager.RestartGame();
+            Debug.Log("Moth game restarted successfully");
+        }
+        else
+        {
+            Debug.LogError("Cannot restart Moth game - MothGameManager reference is missing");
         }
     }
 
-    //[Command(requiresAuthority = false)]
-    //public void CmdReplayTutorial()
-    //{
-    //    if (mothGameManager != null && mothGameManager.audioTutorial != null)
-    //    {
-    //        // Replay the tutorial by calling the play method on the audio tutorial
-    //        mothGameManager.audioTutorial.OnGameStart();
-    //        Debug.Log("Replaying moth game tutorial");
-    //    }
-    //    else
-    //    {
-    //        Debug.LogError("MothGameManager or audioTutorial is null, cannot replay tutorial");
-    //    }
-    //}
+    // Optional: Add this method back if you want tutorial replay functionality
+    /*
+    [Command(requiresAuthority = false)]
+    public void CmdReplayTutorial()
+    {
+        if (mothGameManager != null && mothGameManager.audioTutorial != null)
+        {
+            // Replay the tutorial
+            mothGameManager.audioTutorial.OnGameStart();
+            Debug.Log("Replaying moth game tutorial");
+        }
+        else
+        {
+            Debug.LogError("MothGameManager or audioTutorial is null, cannot replay tutorial");
+        }
+    }
+    */
 
     // Override LoadLevel
     [ClientRpc]

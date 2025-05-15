@@ -2464,8 +2464,8 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 306246764415810355}
         m_TargetAssemblyTypeName: MobileMenuManager, Assembly-CSharp
-        m_MethodName: LoadMothGame
-        m_Mode: 1
+        m_MethodName: CmdLoadMothLevel
+        m_Mode: 3
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
