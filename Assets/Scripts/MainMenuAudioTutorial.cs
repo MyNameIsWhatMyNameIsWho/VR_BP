@@ -76,6 +76,9 @@ public class MainMenuAudioTutorial : NetworkBehaviour
 
     private void Start()
     {
+        // DISABLED: Audio tutorial functionality is temporarily disabled
+        return;
+        
         if (!isServer) return;
 
         // Only play if it hasn't been played yet in this session
@@ -137,6 +140,9 @@ public class MainMenuAudioTutorial : NetworkBehaviour
 
     private IEnumerator StartTutorialSequence()
     {
+        // DISABLED: Audio tutorial functionality is temporarily disabled
+        yield break;
+        
         // Wait initial delay before starting
         yield return new WaitForSeconds(initialDelay);
 
@@ -354,6 +360,9 @@ public class MainMenuAudioTutorial : NetworkBehaviour
     // Public method to manually reset tutorial progress (can be called from a UI button if needed)
     public void ResetTutorialProgress()
     {
+        // DISABLED: Audio tutorial functionality is temporarily disabled
+        return;
+        
         if (!isServer) return;
 
         PlayerPrefs.SetInt(TUTORIAL_COMPLETED_KEY, 0);

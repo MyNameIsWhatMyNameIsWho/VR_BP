@@ -255,16 +255,42 @@ public class MobileMenuManager : NetworkBehaviour
     public void CmdLoadMothLevel(int level)
     {
         Debug.Log($"Loading Moth level: {level}");
-        MothMenuManager mmm = (MothMenuManager)gameMenu;
-        mmm.LoadMothLevel(level);
+        if (gameMenu == null)
+        {
+            Debug.LogError("gameMenu is null in CmdLoadMothLevel!");
+            return;
+        }
+        
+        if (gameMenu is MothMenuManager)
+        {
+            MothMenuManager mmm = (MothMenuManager)gameMenu;
+            mmm.LoadMothLevel(level);
+        }
+        else
+        {
+            Debug.LogError($"Expected gameMenu to be MothMenuManager but was {gameMenu.GetType().Name}");
+        }
     }
 
     [Command(requiresAuthority = false)]
     public void CmdRestartMothGame()
     {
         Debug.Log("Restarting Moth game");
-        MothMenuManager mmm = (MothMenuManager)gameMenu;
-        mmm.CmdRestartMothGame();
+        if (gameMenu == null)
+        {
+            Debug.LogError("gameMenu is null in CmdRestartMothGame!");
+            return;
+        }
+        
+        if (gameMenu is MothMenuManager)
+        {
+            MothMenuManager mmm = (MothMenuManager)gameMenu;
+            mmm.CmdRestartMothGame();
+        }
+        else
+        {
+            Debug.LogError($"Expected gameMenu to be MothMenuManager but was {gameMenu.GetType().Name}");
+        }
     }
     
     //[Command(requiresAuthority = false)]
@@ -280,15 +306,29 @@ public class MobileMenuManager : NetworkBehaviour
     public void LoadMothGame()
     {
         Debug.Log("Loading Moth game with default level");
-        MothMenuManager mmm = (MothMenuManager)gameMenu;
-        mmm.LoadMothLevel(1); // Default level
+        if (gameMenu is MothMenuManager)
+        {
+            MothMenuManager mmm = (MothMenuManager)gameMenu;
+            mmm.LoadMothLevel(1); // Default level
+        }
+        else
+        {
+            Debug.LogError("Expected gameMenu to be MothMenuManager but was " + gameMenu.GetType().Name);
+        }
     }
     
     // Simple public methods without Command attribute - these should be visible in Unity inspector
     public void StartMothGame()
     {
         Debug.Log("Starting Moth game");
-        CmdLoadMothLevel(1);
+        if (gameMenu is MothMenuManager)
+        {
+            CmdLoadMothLevel(1);
+        }
+        else
+        {
+            Debug.LogError("Expected gameMenu to be MothMenuManager but was " + gameMenu.GetType().Name);
+        }
     }
     
     public void RestartMoth()

@@ -171,6 +171,8 @@ public class MothGameManager : NetworkBehaviour
                 return;
             }
         }
+
+        
     }
 
     private void OnDestroy()
@@ -282,21 +284,13 @@ public class MothGameManager : NetworkBehaviour
         yield return new WaitForSeconds(0.2f);
 
         // Log game data
-        try
-        {
-            if (LoggerCommunicationProvider.Instance != null)
-            {
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_score", "\"" + score.ToString() + "\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_highscore", "\"" + Highscore.ToString() + "\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_moths_caught", "\"" + totalMothsCaught.ToString() + "\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_time", "\"" + gameTimer.ToString("F1") + "\"");
-                LoggerCommunicationProvider.Instance.StopLogging();
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("Error logging end game data: " + e.Message);
-        }
+        
+        LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_score", "\"" + score.ToString() + "\"");
+        LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_highscore", "\"" + Highscore.ToString() + "\"");
+        LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_moths_caught", "\"" + totalMothsCaught.ToString() + "\"");
+        LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_time", "\"" + gameTimer.ToString("F1") + "\"");
+        LoggerCommunicationProvider.Instance.StopLogging();
+        
     }
 
     [ClientRpc]
@@ -380,18 +374,8 @@ public class MothGameManager : NetworkBehaviour
         }
 
         // Start logging
-        try
-        {
-            if (LoggerCommunicationProvider.Instance != null)
-            {
-                LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
-                LoggerCommunicationProvider.Instance.AddToCustomData("moth_game_mode", timedMode ? "\"Timed\"" : "\"Untimed\"");
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("Error starting logging: " + e.Message);
-        }
+        if (LoggerCommunicationProvider.Instance.loggingStarted) LoggerCommunicationProvider.Instance.StopLogging();
+        LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
     }
 
     private void SpawnMoth()

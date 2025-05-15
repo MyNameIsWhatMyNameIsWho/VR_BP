@@ -438,6 +438,7 @@ public class NewGameManager : NetworkBehaviour
             // Update UI with remaining time
             UpdateTimeDisplay(gameTimeLimit - gameTimer);
         }
+        
     }
 
     private void OnDestroy()
@@ -535,22 +536,21 @@ public class NewGameManager : NetworkBehaviour
             DisplayEndGameInfo(true);
 
             // Log game data
-            if (LoggerCommunicationProvider.Instance != null)
+            
+            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_score", "\"" + score.ToString() + "\"");
+            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_highscore", "\"" + Highscore.ToString() + "\"");
+            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode",
+                isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
+
+            // Add difficulty level logging when in obstacle mode
+            if (!isCollectionMode)
             {
-                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_score", "\"" + score.ToString() + "\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_highscore", "\"" + Highscore.ToString() + "\"");
-                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode",
-                    isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
-
-                // Add difficulty level logging when in obstacle mode
-                if (!isCollectionMode)
-                {
-                    LoggerCommunicationProvider.Instance.AddToCustomData("newgame_difficulty",
-                        $"\"{currentDifficultyLevel}\"");
-                }
-
-                LoggerCommunicationProvider.Instance.StopLogging();
+                LoggerCommunicationProvider.Instance.AddToCustomData("newgame_difficulty",
+                    $"\"{currentDifficultyLevel}\"");
             }
+
+            LoggerCommunicationProvider.Instance.StopLogging();
+            
         }
 
         // Invoke the game end event to update UI
@@ -663,12 +663,9 @@ public class NewGameManager : NetworkBehaviour
         }
 
         // Log game start
-        if (LoggerCommunicationProvider.Instance != null)
-        {
-            LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
-            LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode",
-                isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
-        }
+        
+        LoggerCommunicationProvider.Instance.StartLogging(SceneManager.GetActiveScene().name);
+        LoggerCommunicationProvider.Instance.AddToCustomData("newgame_mode", isCollectionMode ? "\"Collection Mode\"" : "\"Obstacle Mode\"");
     }
 
     private IEnumerator SpawnObstacles()
