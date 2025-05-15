@@ -114,39 +114,39 @@ public class MothGameManager : NetworkBehaviour
         }
     }
 
-   private void Start()
-{
-    menuManager = FindFirstObjectByType<GameMenuManager>();
-
-    // ALWAYS force reset the highscore when the game starts
-    ForceHighscoreReset();
-
-    OnGameEnd.AddListener(() => {
-        initialButtons.SetActive(true);
-        inGameButton.SetActive(false);
-    });
-
-    OnGameStart.AddListener(() => {
-        initialButtons.SetActive(false);
-        inGameButton.SetActive(true);
-    });
-
-    if (endgameInfo != null)
+    private void Start()
     {
-        endgameInfo.SetActive(false);
+        menuManager = FindFirstObjectByType<GameMenuManager>();
+
+        // ALWAYS force reset the highscore when the game starts
+        ForceHighscoreReset();
+
+        OnGameEnd.AddListener(() => {
+            initialButtons.SetActive(true);
+            inGameButton.SetActive(false);
+        });
+
+        OnGameStart.AddListener(() => {
+            initialButtons.SetActive(false);
+            inGameButton.SetActive(true);
+        });
+
+        if (endgameInfo != null)
+        {
+            endgameInfo.SetActive(false);
+        }
+
+        if (!isServer) return;
+
+        // Hide timer if not in timed mode
+        if (!timedMode && timeText != null)
+        {
+            timeText.gameObject.SetActive(false);
+        }
+
+        // Initial score display
+        ChangeScore(0);
     }
-
-    if (!isServer) return;
-
-    // Hide timer if not in timed mode
-    if (!timedMode && timeText != null)
-    {
-        timeText.gameObject.SetActive(false);
-    }
-
-    // Initial score display
-    ChangeScore(0);
-}
 
     private void Update()
     {
