@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 /// <summary>
 /// Simple color combo system for moth game
@@ -23,6 +24,9 @@ public class MothColorCombo : MonoBehaviour
     [SerializeField] private float pointsPerCombo = 5.0f;          // Points per combo moth
     [SerializeField] private bool showDebugMessages = true;        // Whether to show debug messages
 
+    [Header("UI")]
+    [SerializeField] private TextMeshPro comboDisplayText; // Changed from TextMeshProUGUI to TextMeshPro
+
     // Combo tracking
     private Color currentComboColor;
     private int comboCount = 0;
@@ -37,6 +41,14 @@ public class MothColorCombo : MonoBehaviour
         if (gameManager == null)
         {
             Debug.LogError("MothGameManager not found!");
+        }
+        if (comboDisplayText == null)
+        {
+            Debug.LogWarning("Combo Display Text not assigned in the inspector!");
+        }
+        else
+        {
+            comboDisplayText.text = ""; // Initialize text
         }
     }
 
@@ -55,70 +67,93 @@ public class MothColorCombo : MonoBehaviour
     /// <returns>Bonus points to award for this catch based on combo</returns>
     public int ProcessCaughtMoth(Color mothColor)
     {
-        string colorName = ColorToName(mothColor);
+        string newMothColorName = ColorToName(mothColor); // Name of the currently caught moth's color
         int bonusPoints = 0;
+        bool comboAwardedThisCatch = false; // Flag to track if KOMBO message was just shown
 
-        // Case 1: First moth or different color than current combo
+        // Case 1: First moth, or different color than current combo
         if (!isComboActive || !ColorMatches(mothColor, currentComboColor))
         {
-            // If we had an active combo, finish it first and award points/time
+            // Store details of the combo that might be ending
+            Color previousActiveComboColor = currentComboColor; 
+            string previousActiveComboColorName = isComboActive ? ColorToName(previousActiveComboColor) : "None";
+
+            // If there was an active combo, try to complete it
             if (isComboActive && comboCount >= minComboLength)
             {
-                // Calculate rewards - progressively increasing with combo length
                 float timeReward = baseTimeReward + (additionalTimePerCombo * (comboCount - minComboLength));
                 bonusPoints = Mathf.RoundToInt(pointsPerCombo * comboCount);
 
                 if (showDebugMessages)
                 {
-                    Debug.Log($"COMBO COMPLETED: {comboCount}x {ColorToName(currentComboColor)} → " +
+                    Debug.Log($"COMBO COMPLETED: {comboCount}x {previousActiveComboColorName} → " +
                              $"Awarding {timeReward:F1}s and {bonusPoints} points");
                 }
 
-                // Award the time
+                if (comboDisplayText != null)
+                {
+                    comboDisplayText.text = $"KOMBO! +{bonusPoints} bodů";
+                    comboDisplayText.color = Color.yellow; // Set KOMBO! text color to yellow
+                }
+                comboAwardedThisCatch = true;
+
                 if (gameManager != null)
                 {
                     gameManager.AddTimeReward(timeReward);
-
-                    // Play a sound to indicate combo success
-                    if (AudioManager.Instance != null)
-                    {
-                        AudioManager.Instance.PlaySFX("SuccessFeedback");
-                    }
+                    if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("SuccessFeedback");
                 }
             }
-            else if (isComboActive)
+            else if (isComboActive) // Combo was active but too short
             {
-                // Combo was too short
                 if (showDebugMessages)
                 {
-                    Debug.Log($"Combo too short: {comboCount}x {ColorToName(currentComboColor)} " +
+                    Debug.Log($"Combo too short: {comboCount}x {previousActiveComboColorName} " +
                              $"(min {minComboLength} needed)");
+                }
+                if (comboDisplayText != null)
+                {
+                    comboDisplayText.text = ""; // Clear text for short/broken combo
                 }
             }
 
-            // Start new combo with this color
+            // Start new combo with the newly caught moth
             currentComboColor = mothColor;
             comboCount = 1;
             isComboActive = true;
 
             if (showDebugMessages)
             {
-                Debug.Log($"NEW COMBO STARTED: {colorName} (1)");
+                Debug.Log($"NEW COMBO STARTED: {newMothColorName} (1)");
+            }
+
+            // Update display text:
+            // If a combo was just awarded, the "KOMBO!" message is already shown and should persist.
+            // Otherwise, show the start of the new combo.
+            if (comboDisplayText != null)
+            {
+                if (!comboAwardedThisCatch)
+                {
+                    comboDisplayText.text = $"{newMothColorName} x{comboCount}";
+                    comboDisplayText.color = currentComboColor; // This is the new moth's color
+                }
+                // If comboAwardedThisCatch is true, the text is already "KOMBO!" with the previous combo's color.
+                // It will be updated by the next moth catch.
             }
         }
-        // Case 2: Same color as current combo
+        // Case 2: Same color as current combo (continuing existing combo)
         else
         {
-            // Continue the combo
             comboCount++;
-
             if (showDebugMessages)
             {
-                Debug.Log($"COMBO CONTINUED: {colorName} ({comboCount})");
+                Debug.Log($"COMBO CONTINUED: {newMothColorName} ({comboCount})");
+            }
+            if (comboDisplayText != null)
+            {
+                comboDisplayText.text = $"{newMothColorName} x{comboCount}";
+                comboDisplayText.color = currentComboColor; 
             }
         }
-
-        // Return bonus points (if any)
         return bonusPoints;
     }
 
@@ -145,6 +180,10 @@ public class MothColorCombo : MonoBehaviour
         {
             Debug.Log("COMBO SYSTEM RESET");
         }
+        if (comboDisplayText != null)
+        {
+            comboDisplayText.text = ""; // Clear UI text on reset
+        }
     }
 
     /// <summary>
@@ -170,15 +209,15 @@ public class MothColorCombo : MonoBehaviour
             }
         }
 
-        // Return the appropriate name
+        // Return the appropriate name in Czech
         switch (closestIndex)
         {
-            case 0: return "Red";
-            case 1: return "Green";
-            case 2: return "Blue";
-            case 3: return "Yellow";
-            case 4: return "Purple";
-            default: return "Unknown";
+            case 0: return "Červená"; // Red
+            case 1: return "Zelená";  // Green
+            case 2: return "Modrá";   // Blue
+            case 3: return "Žlutá";   // Yellow
+            case 4: return "Fialová"; // Purple
+            default: return "Neznámá"; // Unknown
         }
     }
 

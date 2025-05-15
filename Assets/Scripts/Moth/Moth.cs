@@ -30,8 +30,8 @@ public class Moth : NetworkBehaviour
     private Quaternion currentRotation;
     
     // Sync update frequency
-    private float syncInterval = 0.05f; // 20 updates per second
-    private float lastSyncTime = 0f;
+    private float customSyncInterval = 0.05f; // Renamed from syncInterval
+    private float lastCustomSyncTime = 0f;    // Renamed from lastSyncTime
 
     // Renderer cache
     private MeshRenderer meshRenderer;
@@ -133,10 +133,10 @@ public class Moth : NetworkBehaviour
         transform.rotation = currentRotation;
         
         // Sync position and rotation to clients at regular intervals
-        if (Time.time - lastSyncTime > syncInterval)
+        if (Time.time - lastCustomSyncTime > customSyncInterval)
         {
             RpcUpdatePositionAndRotation(currentPosition, currentRotation);
-            lastSyncTime = Time.time;
+            lastCustomSyncTime = Time.time;
         }
     }
     

@@ -481,7 +481,6 @@ MonoBehaviour:
   timeText: {fileID: 3702785781749145556}
   finalScoreText: {fileID: 4499558253332574733}
   highScoreText: {fileID: 7037428679258922479}
-  comboText: {fileID: 394318481209863269}
   successEffect: {fileID: 0}
   enableColorCombos: 1
   colorComboManager: {fileID: 9175400404888919776}
@@ -514,6 +513,7 @@ MonoBehaviour:
   additionalTimePerCombo: 5
   pointsPerCombo: 10
   showDebugMessages: 1
+  comboDisplayText: {fileID: 394318481209863269}
 --- !u!114 &2603373783688940075
 MonoBehaviour:
   m_ObjectHideFlags: 0
