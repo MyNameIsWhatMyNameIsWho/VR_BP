@@ -77,7 +77,7 @@ public class MainMenuAudioTutorial : NetworkBehaviour
     private void Start()
     {
         // DISABLED: Audio tutorial functionality is temporarily disabled
-        return;
+        //return;
         
         if (!isServer) return;
 
@@ -141,7 +141,7 @@ public class MainMenuAudioTutorial : NetworkBehaviour
     private IEnumerator StartTutorialSequence()
     {
         // DISABLED: Audio tutorial functionality is temporarily disabled
-        yield break;
+        //yield break;
         
         // Wait initial delay before starting
         yield return new WaitForSeconds(initialDelay);
@@ -361,7 +361,7 @@ public class MainMenuAudioTutorial : NetworkBehaviour
     public void ResetTutorialProgress()
     {
         // DISABLED: Audio tutorial functionality is temporarily disabled
-        return;
+        //return;
         
         if (!isServer) return;
 
